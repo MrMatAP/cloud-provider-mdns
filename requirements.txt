@@ -1,0 +1,15 @@
+#
+# Runtime requirements
+
+rich==13.9.4                     # MIT
+requests==2.32.3                 # Apache 2.0
+pyyaml==6.0.2                    # MIT
+kubernetes-asyncio==31.1.0               # Apache 2.0
+zeroconf==0.136.2                # LPGL-2.1-or-later
+pydantic==2.10.3                 # MIT
+
+# For k8s_gateway_api
+
+urllib3 >= 1.25.3, < 3.0.0
+python_dateutil >= 2.8.2
+typing-extensions >= 4.7.1
