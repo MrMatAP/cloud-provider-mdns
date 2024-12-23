@@ -6,10 +6,10 @@ requires = [
 build-backend = 'setuptools.build_meta'
 
 [project]
-name = "cloud-provider-local"
-description = "A cloud provider emulation for local Kubernetes development"
-urls = { "Sources" = "https://github.com/MrMatAP/cloud-provider-local" }
-keywords = ["kubernetes"]
+name = "cloud-provider-mdns"
+description = "A cloud provider to register services exposed by your cluster in Multicast DNS"
+urls = { "Sources" = "https://github.com/MrMatAP/cloud-provider-mdns" }
+keywords = ["kubernetes", "mdns"]
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
@@ -33,20 +33,20 @@ optional-dependencies = { dev = {file = ["requirements.dev.txt"] } }
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["cloud_provider_local*", "k8s_gateway_api*"]
+include = ["cloud_provider_mdns*", "k8s_gateway_api*"]
 namespaces = true
 
 [tool.setuptools.package-data]
 "*" = [".mo", "*.yml", "*.yaml", "*.md", "inventory", "*.j2", "*.html", "*.ico", "*.css", "*.js", "*.svg", "*.woff", "*.eot", "*.ttf"]
 
 [project.scripts]
-cloud-provider-local = "cloud_provider_local.cli.run:main"
+cloud-provider-mdns = "cloud_provider_mdns.cli.run:main"
 
 # If you are debugging your tests using PyCharm then comment out the coverage options
 # in addopts
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "--cov=cloud-provider-local --cov-report=term --cov-report=xml:build/coverage.xml --junit-xml=build/junit.xml"
+addopts = "--cov=cloud-provider-mdns --cov-report=term --cov-report=xml:build/coverage.xml --junit-xml=build/junit.xml"
 testpaths = ["tests"]
 junit_family = "xunit2"
 log_cli = 1

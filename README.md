@@ -1,6 +1,6 @@
-# cloud-provider-local
+# cloud-provider-mdns
 
-A cloud provider emulation for local Kubernetes development
+A cloud provider to register services exposed by your cluster in Multicast DNS
 
 ## How to run this
 
