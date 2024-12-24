@@ -40,21 +40,7 @@ namespaces = true
 "*" = [".mo", "*.yml", "*.yaml", "*.md", "inventory", "*.j2", "*.html", "*.ico", "*.css", "*.js", "*.svg", "*.woff", "*.eot", "*.ttf"]
 
 [project.scripts]
-cloud-provider-mdns = "cloud_provider_mdns.cli.run:main"
-
-# If you are debugging your tests using PyCharm then comment out the coverage options
-# in addopts
-[tool.pytest.ini_options]
-minversion = "6.0"
-addopts = "--cov=cloud-provider-mdns --cov-report=term --cov-report=xml:build/coverage.xml --junit-xml=build/junit.xml"
-testpaths = ["tests"]
-junit_family = "xunit2"
-log_cli = 1
-log_cli_level = "INFO"
-log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
-log_cli_date_format="%Y-%m-%d %H:%M:%S"
-asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope='session'
+cloud-provider-mdns = "cloud_provider_mdns.cli:run"
 
 [tool.mypy]
 plugins = [ 'pydantic.mypy' ]

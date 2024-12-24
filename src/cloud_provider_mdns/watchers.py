@@ -1,66 +1,90 @@
-import typing
 import asyncio
 
-import kubernetes_asyncio as kubernetes
+import kubernetes_asyncio as kubernetes # type: ignore
+
 from k8s_gateway_api import IoK8sNetworkingGatewayV1HTTPRoute
-from base import BaseTask, NSUpdate, NSUpdateType
+from cloud_provider_mdns.base import BaseTask, NSRecord
+from cloud_provider_mdns.registries import RecordRegistry, GatewayRegistry
+
 
 class HTTPRouteWatcher(BaseTask):
 
-    def __init__(self, api: kubernetes.client.CustomObjectsApi, q: asyncio.Queue):
+    def __init__(self,
+                 api: kubernetes.client.CustomObjectsApi,
+                 record_registry: RecordRegistry,
+                 gtw_registry: GatewayRegistry):
         super().__init__()
         self._api = api
-        self._q = q
-        self._known: typing.List[str] = []
+        self._gtw_registry = gtw_registry
+        self._record_registry = record_registry
+        self._should_stop = False
+        self._watch = kubernetes.watch.Watch()
 
     async def run(self):
+        self._logger.info('Starting')
         try:
-            self._logger.info('Starting')
             while True:
+                if self._should_stop:
+                    self._watch.stop()
+                    return
                 try:
-                    w = kubernetes.watch.Watch()
-                    async for event in w.stream(self._api.list_cluster_custom_object,
+                    async for event in self._watch.stream(self._api.list_cluster_custom_object,
                                                 'gateway.networking.k8s.io',
                                                 'v1',
                                                 'httproutes'):
                         route = IoK8sNetworkingGatewayV1HTTPRoute.model_validate(event['object'])
-                        if len(route.spec.hostnames) > 1:
-                            self._logger.warning(f'Multiple hostnames in HTTPRoute {route.metadata.namespace}/{route.metadata.name} are not yet supported.')
-                        hostname = route.spec.hostnames[0]
-                        # Try to find the gateways this httproute is attached to
-                        addrs: typing.List[str] = []
-                        for parent in route.status.parents:
-                            gtw_raw = await self._api.get_namespaced_custom_object('gateway.networking.k8s.io',
-                                                                             'v1',
-                                                                             parent.parent_ref.namespace,
-                                                                             'gateways',
-                                                                             parent.parent_ref.name)
-                            addresses = gtw_raw.get('status', {}).get('addresses', {})
-                            for addr in addresses:
-                                addrs.append(addr.get('value'))
-                        name_reg = NSUpdate(
-                            update=NSUpdateType.ADD,
-                            name=hostname.replace('.local', ''),
-                            svc='_http._tcp.local.',  # TODO: We should not make this assumption
-                            port=80,  # TODO: We should not make this assumption
-                            ip_addresses=addrs)
+                        auth_id = f'{route.metadata.namespace}/{route.metadata.name}'
+                        if len(route.spec.hostnames) == 0:
+                            self._logger.warning(f'Skipping HTTPRoute {auth_id} without hostnames')
+                            continue
+                        if len(route.status.parents) == 0:
+                            self._logger.warning(f'Skipping HTTPRoute {auth_id} without gateway '
+                                                 f'parent')
+                            continue
+                        elif len(route.status.parents) > 1:
+                            self._logger.warning(f'Multiple gateways in HTTPRoute {auth_id}. '
+                                                 f'Will only register for the first gateway')
+                        gtw = await self._gtw_registry.get_gtw(
+                            route.status.parents[0].parent_ref.namespace,
+                            route.status.parents[0].parent_ref.name)
+
+                        #
+                        # Find records to be removed
+
+                        auth_known_recs = self._record_registry.by_owner(route.metadata.namespace,
+                                                                         route.metadata.name)
+                        for rec in auth_known_recs:
+                            if rec.fqdn not in route.spec.hostnames:
+                                await self._record_registry.remove_record(rec)
+
+                        #
+                        # Find records to add or change
+
+                        for hostname in route.spec.hostnames:
+                            rec = self._record_registry.by_fqdn(hostname)
+                            if rec:
+                                rec.port = gtw.listeners[0].port
+                                rec.ip_addresses = gtw.listeners[0].ip_addresses
+                                await self._record_registry.modify_record(rec)
+                            else:
+                                rec = NSRecord(owner_namespace=route.metadata.namespace,
+                                               owner_name=route.metadata.name,
+                                               fqdn=hostname,
+                                               svc='_http._tcp',
+                                               port=gtw.listeners[0].port,
+                                               ip_addresses=gtw.listeners[0].ip_addresses)
+                                await self._record_registry.add_record(rec)
                         match event['type']:
                             case 'ADDED':
-                                name_reg.update = NSUpdateType.ADD if name_reg.svc_fqdn not in self._known else NSUpdateType.MODIFY
-                                self._logger.info(
-                                    f'Adding new HTTPRoute {route.metadata.namespace}/{route.metadata.name}')
+                                self._logger.info(f'Discovered HTTPRoute {auth_id}')
                             case 'MODIFIED':
-                                name_reg.update = NSUpdateType.MODIFY
-                                self._logger.info(
-                                    f'Modifying HTTPRoute {route.metadata.namespace}/{route.metadata.name}')
+                                self._logger.info(f'HTTPRoute {auth_id} was modified')
                             case 'DELETED':
-                                name_reg.update = NSUpdateType.REMOVE
-                                self._logger.info(
-                                    f'Removing HTTPRoute {route.metadata.namespace}/{route.metadata.name}')
-                        await self._q.put(name_reg)
-                        self._known.append(name_reg.svc_fqdn)
-                except kubernetes.client.exceptions.ApiException as ae:
+                                self._logger.info(f'HTTPRoute {auth_id} was removed')
+                except kubernetes.client.exceptions.ApiException:
                     self._logger.info('Kubernetes API error, restarting')
         except asyncio.CancelledError:
             self._logger.info('Stopping')
+            self._should_stop = True
+            await self._watch.close()
             raise

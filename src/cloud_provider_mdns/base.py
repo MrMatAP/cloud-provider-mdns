@@ -1,41 +1,66 @@
 import abc
+import enum
 import asyncio
 import typing
-import enum
 import dataclasses
 import logging
 
-
-class NSUpdateType(enum.Enum):
-    """
-    An enumeration of update types
-    """
+class NSRecordUpdate(enum.Enum):
     ADD = enum.auto()
     MODIFY = enum.auto()
     REMOVE = enum.auto()
 
-
-@dataclasses.dataclass
-class NSUpdate:
-    """
-    All required data to create, modify or remove a name service record
-    """
-    update: NSUpdateType
-    name: str
-    svc: str
-    ip_addresses: typing.List[str] = dataclasses.field(default_factory=list)
+@dataclasses.dataclass(unsafe_hash=True)
+class NSRecord:
+    fqdn: str
+    owner_namespace: str
+    owner_name: str
+    svc: str = '_http._tcp'
+    ip_addresses: typing.List[str] = dataclasses.field(default_factory=list, hash=False)
     port: int = 80
+    action: NSRecordUpdate | None = dataclasses.field(default=None, hash=False)
+
+    @property
+    def ns_fqdn(self) -> str:
+        return self.fqdn if self.fqdn.endswith('.') else f'{self.fqdn}.'
 
     @property
     def svc_fqdn(self) -> str:
-        return f'{self.name}.{self.svc}'
+        labels = self.fqdn.split('.')
+        hostname = '.'.join(labels[:1])
+        return f'{hostname}.{self.svc}.{labels[-1]}.'
+
+    def owned_by(self, namespace: str, name: str) -> bool:
+        return self.owner_namespace == namespace and self.owner_name == name
 
     @property
-    def fqdn(self) -> str:
-        return f'{self.name}.local'
+    def auth_id(self) -> str:
+        return f'{self.owner_namespace}/{self.owner_name}'
 
 
-class BaseTask:
+@dataclasses.dataclass
+class GatewayListener:
+    """
+    All required data for a listener attached to a Kubernetes Gateway
+    """
+    port: int
+    protocol: str
+    ip_addresses: typing.List[str] = dataclasses.field(default_factory=list)
+
+@dataclasses.dataclass
+class Gateway:
+    """
+    All required data for a Kubernetes Gateway
+    """
+    name: str
+    namespace: str
+    listeners: typing.List[GatewayListener] = dataclasses.field(default_factory=list)
+
+
+class BaseTask(abc.ABC):
+    """
+    A re-usable abstract base class for tasks
+    """
 
     def __init__(self):
         self._logger = logging.getLogger(self.__class__.__name__)
