@@ -68,7 +68,7 @@ jobs:
     - name: Build
       run: |
         cd ${GITHUB_WORKSPACE}
-        pip install --user -r dev-requirements.txt
+        pip install --user -r requirements.dev.txt
         python -m build --wheel -n
 
     - name: Conditional Release
