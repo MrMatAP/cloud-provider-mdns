@@ -23,8 +23,10 @@ methods of doing that are:
 3. In a separate terminal, start this tool and keep it running. Hit Ctrl-C to stop it.
 
 ```shell
-$ cloud-provider-mdns
+$ /path/to/virtualenv/bin/cloud-provider-mdns
 ```
+
+> It is not necessary to activate the virtual environment you installed the script in.
 
 ## How to build this
 
@@ -41,13 +43,16 @@ $ . /path/to/virtualenv/bin/activate
 ... many lines omitted
 Successfully built cloud_provider_mdns-0.0.0.dev0-py3-none-any.whl
 
-(venv) $ deactivate
-$ PYTHONUSERBASE=~/.local pip3 install --user --break-system-packages dist/cloud_provider_mdns-*.whl
+(venv) $ pip3 install dist/cloud_provider_mdns-*.whl
 ... many lines omitted
 ```
 
-The script and its dependencies are installed in `~/.local/bin/cloud-provider-mdns`. It is useful to add that directory
-to your PATH.
+It is best to install the script into the virtual environment. If you do not like that, you can deactivate the
+virtual environment and install into whatever your Python considers the user installation directory. On Linux, that
+directory is going to be `~/.local`. On MacOs it's `~/Library/Python/<Python Version>`. If you don't like that either,
+you can permanently set the PYTHONUSERBASE environment variable to wherever things are to be installed. Current Python
+is very picky about you installing outside a virtual environment, so you must specify the `--user` and 
+`--break-system-packages` options to pip when doing that. 
 
 ## Issues & Limitations
 
