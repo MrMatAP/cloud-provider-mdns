@@ -51,6 +51,7 @@ to your PATH.
 
 ## Issues & Limitations
 
+* There is currently no testsuite
 * This has been tested on a Mac, Docker, kind, Istio and the new Kubernetes Gateway API
 * There is an unclean shut down of the watch client session when cancelling the watch task
 * The new Kubernetes Gateway API is not part of the mainline Kubernetes client API. See below how to generate model classes for it
