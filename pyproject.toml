@@ -1,0 +1,51 @@
+[build-system]
+requires = [
+    'setuptools==75.6.0',
+    'wheel==0.45.1'
+]
+build-backend = 'setuptools.build_meta'
+
+[project]
+name = "cloud-provider-mdns"
+description = "A cloud provider to register services exposed by your cluster in Multicast DNS"
+urls = { "Sources" = "https://github.com/MrMatAP/cloud-provider-mdns" }
+keywords = ["kubernetes", "mdns"]
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { "name" = "Mathieu Imfeld", "email" = "imfeldma+9jqerw@gmail.com" }
+]
+maintainers = [
+    { "name" = "Mathieu Imfeld", "email" = "imfeldma+9jqerw@gmail.com" }
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: MIT",
+    "Programming Language :: Python :: 3.12"
+]
+requires-python = ">=3.12"
+dynamic = ["version", "dependencies", "optional-dependencies"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ci.version"}
+dependencies = {file = ["requirements.txt"]}
+optional-dependencies = { dev = {file = ["requirements.dev.txt"] } }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["cloud_provider_mdns*", "k8s_gateway_api*"]
+namespaces = true
+
+[tool.setuptools.package-data]
+"*" = [".mo", "*.yml", "*.yaml", "*.md", "inventory", "*.j2", "*.html", "*.ico", "*.css", "*.js", "*.svg", "*.woff", "*.eot", "*.ttf"]
+
+[project.scripts]
+cloud-provider-mdns = "cloud_provider_mdns.cli:run"
+
+[tool.mypy]
+plugins = [ 'pydantic.mypy' ]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
