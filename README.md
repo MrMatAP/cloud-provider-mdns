@@ -6,15 +6,17 @@ This is a proof of concept that it is possible to maintain human-readable names 
 declarations of such names in Kubernetes resources, pointing to the edge on which it exposes those resources. It is
 intended to simplify local development, without the need of running a DNS server or manually hacking your hosts file.
 
+Basically run this, watch it find resources, then type them into your browser.
+
 Your Kubernetes cluster will have some form of traffic routing implementation to expose services to you. The typical
 methods of doing that are:
 
 * A service of type Loadbalancer  
-  Such services may receive an IP address from your cloud provider or tools such as [cloud-provider-kind](https://github.com/kubernetes-sigs/cloud-provider-kind). Their result is an accessible IP address you can use to directly interact with the service to which that IP is assigned. If you wish to use some human-readable name then you must edit your hosts file or register that IP address in DNS. If the IP address changes you must do so again. While this tool could register that IP address for you in mDNS, it would have to do so by evaluating some label or annotation and it doesn't currently do this, so **this is not yet supported**.
+  Such services may receive an IP address from your cloud provider or tools such as [cloud-provider-kind](https://github.com/kubernetes-sigs/cloud-provider-kind). Their result is an accessible IP address you can use to directly interact with the service to which that IP is assigned. If you wish to use some human-readable name then you must edit your hosts file or register that IP address in DNS. If the IP address changes you must do so again. While this tool could register that IP address for you in mDNS, it would have to do so by evaluating some label or annotation and it doesn't currently do this, so **this doesn't work yet**.
 * An Ingress Controller at the edge and Ingress resources exposing individual apps  
-  The Ingress controller will expose itself using some IP address which it usually obtains by exposing a service of type Loadbalancer itself. Individual apps then associate themselves with that Ingress controller via an Ingress resource that defines the FQDN they want to be reachable as. **This is not yet supported**.
+  The Ingress controller will expose itself using some IP address which it usually obtains by exposing a service of type Loadbalancer itself. Individual apps then associate themselves with that Ingress controller via an Ingress resource that defines the FQDN they want to be reachable as. **This works more or less**.
 * The new [Kubernetes Gateway API](https://gateway-api.sigs.k8s.io) at the endge and HTTPRoutes exposing individual apps  
-  The Kubernetes Gateway API is an abstraction of Ingress (actually including the scenario and replacing the Ingress resource with its HTTP and GRPCRoutes). The FQDN individual apps are exposed with is defined in the HTTPRoute and GRPCRoutes analogue to the Ingress resource). **This is supported**.
+  The Kubernetes Gateway API is an abstraction of Ingress (actually including the scenario and replacing the Ingress resource with its HTTP and GRPCRoutes). The FQDN individual apps are exposed with is defined in the HTTPRoute and GRPCRoutes analogue to the Ingress resource). **This works**.
 
 ## How to run this
 
@@ -27,6 +29,10 @@ $ /path/to/virtualenv/bin/cloud-provider-mdns
 ```
 
 > It is not necessary to activate the virtual environment you installed the script in.
+
+4. Declare an Ingress or a HTTPRoute with a hostname that ends in '.local'
+5. Watch the output of cloud-provider-mdns
+6. Type the name into your browser
 
 ## How to build this
 
@@ -58,8 +64,10 @@ is very picky about you installing outside a virtual environment, so you must sp
 
 * There is currently no testsuite
 * This has been tested on a Mac, Docker, kind, Istio and the new Kubernetes Gateway API
+* This has been tested on a Mac, Docker Desktop Kubernetes and an nginx Ingress Controller
 * There is an unclean shut down of the watch client session when cancelling the watch task
 * The new Kubernetes Gateway API is not part of the mainline Kubernetes client API. See below how to generate model classes for it
+* Ingress controllers sometimes take quite a bit of time to reconfigure themselves. Ingresses without a controller assigned are ignored until the next update cycle
 
 ## Notes
 
