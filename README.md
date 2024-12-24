@@ -108,3 +108,4 @@ for event in w.stream(api.list_cluster_custom_object, 'gateway.networking.k8s.io
   print(event)
   gtw = k8s_gateway_api.models.io_k8s_networking_gateway_v1_gateway.IoK8sNetworkingGatewayV1Gateway.model_validate(event['object'])
 ```
+
