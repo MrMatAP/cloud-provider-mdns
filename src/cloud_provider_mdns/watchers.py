@@ -115,7 +115,7 @@ class HTTPRouteWatcher(BaseTask):
                                                 'gateway.networking.k8s.io',
                                                 'v1',
                                                 'httproutes'):
-                        if type(event) != 'dict':
+                        if not isinstance(event, dict):
                             self._logger.warning(f'Kubernetes cluster does not know the Gateway API. No longer looking for HTTPRoutes.')
                             return
                         route = IoK8sNetworkingGatewayV1HTTPRoute.model_validate(event['object'])
