@@ -1,49 +1,9 @@
 import typing
 import asyncio
 
-import kubernetes_asyncio as kubernetes # type: ignore
+import kubernetes_asyncio as kubernetes
 
-from cloud_provider_mdns.base import Gateway, GatewayListener, NSRecord, NSRecordUpdate
-
-
-class GatewayRegistry:
-    """
-    Utility class for resources making use of the Gateway API to look up their reference.
-    We could add caching to this, but it's somewhat dangerous since the gateway may have been
-    modified since we last cached it. We could watch for Gateway changes, but there is no
-    guarantee that we would capture the change before the resource using the Gateway. So for now,
-    we'll just make an additional API call
-    """
-
-    def __init__(self, api: kubernetes.client.CustomObjectsApi):
-        self._api = api
-
-    # The obvious choice here would be to deserialise the IoK8sNetworkingGatewayV1Gateway model
-    # but it fails to parse the IPAddresses in its inner status
-    async def get_gtw(self, namespace: str, name: str) -> Gateway:
-        """
-        Query the Kubernetes API for a Gateway reference
-        Args:
-            namespace (): The namespace of the Gateway
-            name (): The gateway name
-
-        Returns:
-            A Gateway object
-        """
-        gtw_raw = await self._api.get_namespaced_custom_object('gateway.networking.k8s.io',
-                                                               'v1',
-                                                               namespace,
-                                                               'gateways',
-                                                               name)
-        gtw_addresses = gtw_raw.get('status', {}).get('addresses', {})
-        gtw_listeners = gtw_raw.get('spec', {}).get('listeners', [])
-        listeners = [GatewayListener(port=l.get('port'),
-                                     protocol=l.get('protocol'),
-                                     ip_addresses=[a.get('value') for a in gtw_addresses])
-                     for l in gtw_listeners]
-        return Gateway(namespace=namespace,
-                       name=name,
-                       listeners=listeners)
+from cloud_provider_mdns.base import NSRecord, NSRecordUpdate
 
 
 class RecordRegistry:
