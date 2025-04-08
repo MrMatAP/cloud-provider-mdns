@@ -49,7 +49,7 @@ class RecordRegistry:
         Returns:
             A set of NSRecord objects known to be owned by the specified resource
         """
-        return {rec for rec in self._records if rec.owned_by(namespace, name)}
+        return {rec for rec in self._records if rec.is_owner(namespace, name)}
 
     def subscribe(self, consumer: str) -> asyncio.Queue:
         """

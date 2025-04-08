@@ -5,56 +5,158 @@ import typing
 import dataclasses
 import logging
 
+import pydantic
+
+class PydanticIgnoreExtraFields(pydantic.BaseModel):
+    """
+    A base class for Pydantic models that ignores extra fields
+    """
+    class Config:
+        extra = 'ignore'
+
+class ResourceMetadata(PydanticIgnoreExtraFields):
+    """
+    Metadata for a HTTPRoute
+    """
+    name: str
+    namespace: str
+
+class HTTPRouteSpec(PydanticIgnoreExtraFields):
+    """
+    Spec for a HTTPRoute
+    """
+    hostnames: typing.List[str] = pydantic.Field(default_factory=list)
+
+class HTTPRouteParentRef(PydanticIgnoreExtraFields):
+    """
+    ParentRef for a HTTPRoute
+    """
+    group: str | None = None
+    kind: str
+    name: str
+    namespace: str | None = None
+    sectionName: str | None = None
+
+class HTTPRouteStatusCondition(PydanticIgnoreExtraFields):
+    """
+    Status condition for a HTTPRoute
+    """
+    type: str
+    status: bool
+    reason: str | None = None
+    message: str | None = None
+
+class HTTPRouteStatusParent(PydanticIgnoreExtraFields):
+    """
+    Status for a HTTPRoute parent
+    """
+    conditions: typing.List[HTTPRouteStatusCondition] = pydantic.Field(default_factory=list)
+    parentRef: HTTPRouteParentRef
+
+class HTTPRouteStatus(PydanticIgnoreExtraFields):
+    """
+    Status for a HTTPRoute
+    """
+    parents: typing.List[HTTPRouteStatusParent] = pydantic.Field(default_factory=list)
+
+class HTTPRoute(PydanticIgnoreExtraFields):
+    """
+    A record for a HTTPRoute
+    """
+    metadata: ResourceMetadata
+    spec: HTTPRouteSpec
+    status: HTTPRouteStatus
+
+    def accepted(self) -> bool:
+        if len(self.status.parents) == 0:
+            return False
+        return all(condition.status for condition in self.status.parents[0].conditions \
+                   if condition.type == 'Accepted')
+
+    def __str__(self) -> str:
+        return f'{self.metadata.namespace}/{self.metadata.name}'
+
+class GatewayListenerSpec(PydanticIgnoreExtraFields):
+    """
+    Spec for a GatewayListener
+    """
+    name: str
+    port: int
+    protocol: str
+
+class GatewaySpec(PydanticIgnoreExtraFields):
+    """
+    Spec for a Gateway
+    """
+    listeners: typing.List[GatewayListenerSpec] = pydantic.Field(default_factory=list)
+
+class GatewayAddresses(PydanticIgnoreExtraFields):
+    """
+    Addresses for a Gateway
+    """
+    type: str
+    value: str | None = None
+
+class GatewayStatus(PydanticIgnoreExtraFields):
+    """
+    Status for a Gateway
+    """
+    addresses: typing.List[GatewayAddresses] = pydantic.Field(default_factory=list)
+
+class Gateway(PydanticIgnoreExtraFields):
+    """
+    A record for a Gateway
+    """
+    metadata: ResourceMetadata
+    spec: GatewaySpec
+    status: GatewayStatus
+
+    def addresses(self) -> typing.List[str]:
+        """
+        Get the IP addresses for the Gateway
+        """
+        return [address.value for address in self.status.addresses \
+                if address.type == 'IPAddress']
+
+    def listener_by_section_name(self, section_name: str) -> GatewayListenerSpec | None:
+        """
+        Get the listener by section name
+        """
+        for listener in self.spec.listeners:
+            if listener.name == section_name:
+                return listener
+        return None
+
+    def __str__(self) -> str:
+        return f'{self.metadata.namespace}/{self.metadata.name}'
+
 class NSRecordUpdate(enum.Enum):
     ADD = enum.auto()
     MODIFY = enum.auto()
     REMOVE = enum.auto()
 
-@dataclasses.dataclass(unsafe_hash=True)
-class NSRecord:
-    fqdn: str
-    owner_namespace: str
-    owner_name: str
-    svc: str = '_http._tcp'
-    ip_addresses: typing.List[str] = dataclasses.field(default_factory=list, hash=False)
-    port: int = 80
-    action: NSRecordUpdate | None = dataclasses.field(default=None, hash=False)
-
-    @property
-    def ns_fqdn(self) -> str:
-        return self.fqdn if self.fqdn.endswith('.') else f'{self.fqdn}.'
-
-    @property
-    def svc_fqdn(self) -> str:
-        labels = self.fqdn.split('.')
-        hostname = '.'.join(labels[:1])
-        return f'{hostname}.{self.svc}.{labels[-1]}.'
-
-    def owned_by(self, namespace: str, name: str) -> bool:
-        return self.owner_namespace == namespace and self.owner_name == name
-
-    @property
-    def auth_id(self) -> str:
-        return f'{self.owner_namespace}/{self.owner_name}'
-
-
 @dataclasses.dataclass
-class GatewayListener:
-    """
-    All required data for a listener attached to a Kubernetes Gateway
-    """
+class NSAddressPort:
     port: int
-    protocol: str
     ip_addresses: typing.List[str] = dataclasses.field(default_factory=list)
 
-@dataclasses.dataclass
-class Gateway:
-    """
-    All required data for a Kubernetes Gateway
-    """
-    name: str
+@dataclasses.dataclass(unsafe_hash=True)
+class NSRecord:
     namespace: str
-    listeners: typing.List[GatewayListener] = dataclasses.field(default_factory=list)
+    name: str
+    hostname: str
+    action: NSRecordUpdate | None = dataclasses.field(default=None, hash=False)
+    address_ports: typing.List[NSAddressPort] = dataclasses.field(default_factory=list, hash=False)
+
+    @property
+    def fqdn(self) -> str:
+        return self.hostname if self.hostname.endswith('.') else f'{self.hostname}.'
+
+    def is_owner(self, namespace: str, name: str) -> bool:
+        return self.namespace == namespace and self.name == name
+
+    def __str__(self) -> str:
+        return f'{self.namespace}/{self.name}'
 
 
 class BaseTask(abc.ABC):
@@ -62,7 +164,7 @@ class BaseTask(abc.ABC):
     A re-usable abstract base class for tasks
     """
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         self._logger = logging.getLogger(self.__class__.__name__)
         self._task = None
         self._should_stop = False
