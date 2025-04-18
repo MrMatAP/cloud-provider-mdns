@@ -10,3 +10,6 @@ wheel==0.45.1                       # MIT
 
 mypy==1.13.0                        # MIT
 types-PyYAML==6.0.12.20240311       # Apache 2.0
+pytest==8.3.4                       # MIT
+pytest-asyncio=0.26.0               # MIT
+pytest-mock==3.14.0                 # MIT

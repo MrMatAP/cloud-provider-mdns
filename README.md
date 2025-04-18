@@ -12,15 +12,25 @@ Your Kubernetes cluster will have some form of traffic routing implementation to
 methods of doing that are:
 
 * A service of type Loadbalancer  
-  Such services may receive an IP address from your cloud provider or tools such as [cloud-provider-kind](https://github.com/kubernetes-sigs/cloud-provider-kind). Their result is an accessible IP address you can use to directly interact with the service to which that IP is assigned. If you wish to use some human-readable name then you must edit your hosts file or register that IP address in DNS. If the IP address changes you must do so again. While this tool could register that IP address for you in mDNS, it would have to do so by evaluating some label or annotation and it doesn't currently do this, so **this doesn't work yet**.
+  Such services may receive an IP address from your cloud provider or tools such
+  as [cloud-provider-kind](https://github.com/kubernetes-sigs/cloud-provider-kind). Their result is an accessible IP
+  address you can use to directly interact with the service to which that IP is assigned. If you wish to use some
+  human-readable name then you must edit your hosts file or register that IP address in DNS. If the IP address changes
+  you must do so again. While this tool could register that IP address for you in mDNS, it would have to do so by
+  evaluating some label or annotation and it doesn't currently do this, so **this doesn't work yet**.
 * An Ingress Controller at the edge and Ingress resources exposing individual apps  
-  The Ingress controller will expose itself using some IP address which it usually obtains by exposing a service of type Loadbalancer itself. Individual apps then associate themselves with that Ingress controller via an Ingress resource that defines the FQDN they want to be reachable as. **This works more or less**.
-* The new [Kubernetes Gateway API](https://gateway-api.sigs.k8s.io) at the endge and HTTPRoutes exposing individual apps  
-  The Kubernetes Gateway API is an abstraction of Ingress (actually including the scenario and replacing the Ingress resource with its HTTP and GRPCRoutes). The FQDN individual apps are exposed with is defined in the HTTPRoute and GRPCRoutes analogue to the Ingress resource). **This works**.
+  The Ingress controller will expose itself using some IP address which it usually obtains by exposing a service of type
+  Loadbalancer itself. Individual apps then associate themselves with that Ingress controller via an Ingress resource
+  that defines the FQDN they want to be reachable as. **This works more or less**.
+* The new [Kubernetes Gateway API](https://gateway-api.sigs.k8s.io) at the endge and HTTPRoutes exposing individual
+  apps  
+  The Kubernetes Gateway API is an abstraction of Ingress (actually including the scenario and replacing the Ingress
+  resource with its HTTP and GRPCRoutes). The FQDN individual apps are exposed with is defined in the HTTPRoute and
+  GRPCRoutes analogue to the Ingress resource). **This works**.
 
 ## How to run this
 
-1. One-time: Build and install as described in the "How to build this" section below. 
+1. One-time: Build and install as described in the "How to build this" section below.
 2. Start your Kubernetes cluster and make sure your Kubernetes configuration has it set as its current context
 3. In a separate terminal, start this tool and keep it running. Hit Ctrl-C to stop it.
 
@@ -57,8 +67,8 @@ It is best to install the script into the virtual environment. If you do not lik
 virtual environment and install into whatever your Python considers the user installation directory. On Linux, that
 directory is going to be `~/.local`. On MacOs it's `~/Library/Python/<Python Version>`. If you don't like that either,
 you can permanently set the PYTHONUSERBASE environment variable to wherever things are to be installed. Current Python
-is very picky about you installing outside a virtual environment, so you must specify the `--user` and 
-`--break-system-packages` options to pip when doing that. 
+is very picky about you installing outside a virtual environment, so you must specify the `--user` and
+`--break-system-packages` options to pip when doing that.
 
 ## Issues & Limitations
 
@@ -66,14 +76,16 @@ is very picky about you installing outside a virtual environment, so you must sp
 * This has been tested on a Mac, Docker, kind, Istio and the new Kubernetes Gateway API
 * This has been tested on a Mac, Docker Desktop Kubernetes and an nginx Ingress Controller
 * There is an unclean shut down of the watch client session when cancelling the watch task
-* The new Kubernetes Gateway API is not part of the mainline Kubernetes client API. See below how to generate model classes for it
-* Ingress controllers sometimes take quite a bit of time to reconfigure themselves. Ingresses without a controller assigned are ignored until the next update cycle
+* The new Kubernetes Gateway API is not part of the mainline Kubernetes client API. See below how to generate model
+  classes for it
+* Ingress controllers sometimes take quite a bit of time to reconfigure themselves. Ingresses without a controller
+  assigned are ignored until the next update cycle
 
 ## Notes
 
 ### How to generate your own Kubernetes client.
 
-The Kubernetes Gateway API is not yet part of the Kubernetes Python API distribution in version 31.0.0. 
+The Kubernetes Gateway API is not yet part of the Kubernetes Python API distribution in version 31.0.0.
 That client API is generated using [openapi-generator](https://openapi-generator.tech).
 
 ```shell
@@ -91,7 +103,7 @@ URI and generate client code just for that.
 ### Watching custom resources using the native Kubernetes client
 
 The upstream Kubernetes client adds the watch and config package, which are not part of the client we generate using
-the method above. Worse, there are quite a few incompatibilities. The Watch.stream method forces 
+the method above. Worse, there are quite a few incompatibilities. The Watch.stream method forces
 `_preload_content = False` in kwargs, which the newer generated (Pydantic) classes refuse to deserialise. It is also
 annoying to distribute a custom distribution of the API that just happens in your own cluster that doesn't necessarily
 exist in anyone elses. A better option is to accept that such resources are returned as dicts rather than being
@@ -99,13 +111,75 @@ deserialised by the official Kubernetes client. Here is how you watch for such c
 generated models then it is perfectly possible to cast the event object into such a model.
 
 ```python
-import kubernetes           # Upstream, official Kubernetes client
-import k8s_gateway_api      # Generated ourselves using the method above
+import kubernetes  # Upstream, official Kubernetes client
+import k8s_gateway_api  # Generated ourselves using the method above
+
 kubernetes.config.load_kube_config()
 api = kubernetes.client.CustomObjectsApi()
 w = kubernetes.watch.Watch()
 for event in w.stream(api.list_cluster_custom_object, 'gateway.networking.k8s.io', 'v1', 'gateways'):
-  print(event)
-  gtw = k8s_gateway_api.models.io_k8s_networking_gateway_v1_gateway.IoK8sNetworkingGatewayV1Gateway.model_validate(event['object'])
+    print(event)
+    gtw = k8s_gateway_api.models.io_k8s_networking_gateway_v1_gateway.IoK8sNetworkingGatewayV1Gateway.model_validate(
+        event['object'])
 ```
 
+### Gateway API Conundrums
+
+Applications within a cluster configured to use the Gateway API declare HTTPRoutes rather than Ingress resources.
+HTTPRoutes then "bind" to Gateway resources. Gateway resources may have multiple IP addresses and multiple listeners (for ports and TLS). 
+
+A Gateway with multiple IP addresses and the names of a HTTPRoute registered against all those leads to round-robin
+behaviour in DNS, which is not ideal as it becomes non-deterministic which IP address (and
+therefore which Gateway IP address is resolved for the client. A realistic scenario where this is desirable is when you have a multi-homed cluster where, say, internal users are sent to one Gateway and external users to another. You would then register the same DNS name in different views or DNS servers. This scenario could be solved by this tool recognising an annotation on the Gateway resource explicitly declaring or overriding the DNS view or server that the desired name is to be registered in.
+
+A HTTPRoute by default binds to all listeners of a Gateway. The listener of a Gateway declares the port and protocol, but it re-uses the single IP address of that Gateway against which the names of the HTTPRoute are registered. HTTProutes
+can declare to be bound to a single listener via `sectionName` or `port`. The port binding is obvious when either of
+these is declared. When neither `sectionName` nor `port` is declared then this tool will assume port 443 (if the
+gateway has any listener on that port) or port 80. If neither port 443 nor port 80 is declared in the Gateways listener
+then the tool issues a warning and will not register the name in DNS.
+Clients that rely on session stickiness will not work.
+
+```mermaid
+---
+title: Gateway API
+---
+classDiagram
+    Host --|> LB : resolves hostname in DNS
+    LB --|> Gateway : tunnels traffic to the Gateway
+    Gateway --|> Service
+    Service --|> Pod
+    HTTPRoute "*" --o "*" Gateway : aggregates
+    
+    class Host {
+    }
+    
+    class LB {
+        string DNSName
+        ipaddress[] IPAddresses
+    }
+    
+    class Gateway {
+        string[] serviceNames
+        int[] ports
+        ipaddress[] IPAddresses
+    }
+```
+
+#### One-To-One  
+
+A single HTTPRoute binds to a single Gateway. This is a simple case because all declared hostnames are registered
+against that single Gateway. However, the Gateway can have multiple addresses declared, which will lead to round-robin DNS entries. 
+
+The behaviour of this tool is to register all names declared in the HTTPRoute against all addresses of the Gateway in DNS.
+
+#### Many-To-One  
+
+Many HTTPRoutes bind to a single Gateway. This is a simple case because all declared hostnames are registered
+against the IP addresses of that single Gateway. This is the most common scenario. However, the Gateway can have multiple addresses declared, which will lead to round-robin DNS entries.
+
+The behaviour of this tool is to register all names declared in the HTTPRoute against all addresses of the Gateway in DNS.
+
+#### Many-To-One  
+
+A single HTTPRoute binds to multiple Gateways. This is a more complex case because the declared hostnames are
+registered against the IP addresses of all Gateways. The tool will register the same hostname multiple times, for all IP addresses of all Gateways.

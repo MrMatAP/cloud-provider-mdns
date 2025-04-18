@@ -1,48 +1,37 @@
-import typing
 import asyncio
+import typing
 
 import kubernetes_asyncio as kubernetes
 
-from cloud_provider_mdns.base import BaseTask, NSRecord, \
+from cloud_provider_mdns.base import NSRecord, \
     GatewayNotReadyException, ResourceId, UnidentifiableResourceException, HTTPRoute, Gateway, \
-    NSAddressPort
+    BaseWatcher, Record, RouteParentStatus, ParentReference, BaseNameserver
 from cloud_provider_mdns.registries import RecordRegistry
-
-
-class BaseWatcher(BaseTask):
-
-    def __init__(self, record_registry: RecordRegistry = None):
-        super().__init__()
-        self._watch = kubernetes.watch.Watch()
-        self._record_registry = record_registry
-
-    async def run(self):
-        raise NotImplementedError
-
-    async def add(self, event):
-        raise NotImplementedError
-
-    async def modify(self, event):
-        raise NotImplementedError
-
-    async def remove(self, event):
-        raise NotImplementedError
-
-    @staticmethod
-    async def _has_api(required_api_name: str) -> bool:
-        """
-        Return true when the cluster is aware of the provided API
-        """
-        apis_api = kubernetes.client.ApisApi()
-        resources = await apis_api.get_api_versions()
-        return list(filter(lambda r: r.name == required_api_name, resources.groups)) != []
 
 
 class HTTPRouteWatcher(BaseWatcher):
 
-    def __init__(self, record_registry: RecordRegistry):
-        super().__init__(record_registry)
+    def __init__(self, nameservers: typing.Set[BaseNameserver]):
+        super().__init__(nameservers)
         self._api = kubernetes.client.CustomObjectsApi()
+
+    async def _find_gateway(self, parent: RouteParentStatus) -> Gateway:
+        gtw = await self._api.get_namespaced_custom_object(group='gateway.networking.k8s.io',
+                                                           version='v1',
+                                                           namespace=parent.parentRef.namespace,
+                                                           plural='gateways',
+                                                           name=parent.parentRef.name)
+        return Gateway.model_validate(gtw)
+
+    @staticmethod
+    def _find_port(gateway: Gateway, parent_spec: ParentReference) -> int:
+        if parent_spec.port is not None:
+            return parent_spec.port
+        elif parent_spec.sectionName is not None:
+            return gateway.port_by_section_name(parent_spec.sectionName)
+        elif gateway.listens_on_port(443):
+            return 443
+        return 80
 
     async def add(self, event):
         http_route = HTTPRoute.model_validate(event['object'])
@@ -50,46 +39,43 @@ class HTTPRouteWatcher(BaseWatcher):
             self._logger.warning(f'[{http_route}] has not yet been accepted')
             return
         for parent in http_route.status.parents:
-            gtw = await self._api.get_namespaced_custom_object(group='gateway.networking.k8s.io',
-                                                               version='v1',
-                                                               namespace=parent.parentRef.namespace,
-                                                               plural='gateways',
-                                                               name=parent.parentRef.name)
-            gateway = Gateway.model_validate(gtw)
-            port = gateway.listener_by_section_name(section_name=parent.parentRef.sectionName).port or 80
+            gateway = await self._find_gateway(parent)
+            parent_spec = http_route.spec_parent_by_status_parent_ref(parent)
+            port = self._find_port(gateway, parent_spec)
             for hostname in http_route.spec.hostnames:
-                record = NSRecord(namespace=http_route.metadata.namespace,
-                                  name=http_route.metadata.name,
-                                  hostname=hostname,
-                                  address_ports=[
-                                      NSAddressPort(ip_addresses=gateway.addresses(), port=port)])
-                await self._record_registry.add_record(record)
-                self._logger.info(f'[{http_route}] Discovered HTTPRoute')
+                for ip_address in gateway.addresses():
+                    for ns in self._nameservers:
+                        await ns.add(Record(hostname=hostname,
+                                      ip_address=ip_address,
+                                      port=port))
+            self._logger.info(f'[{http_route}] Added HTTPRoute')
 
     async def modify(self, event):
         http_route = HTTPRoute.model_validate(event['object'])
-        auth_known_recs = self._record_registry.by_owner(http_route.metadata.namespace,
-                                                         http_route.metadata.name)
-        for rec in auth_known_recs:
-            for parent in http_route.status.parents:
-                gtw = await self._api.get_namespaced_custom_object(group='gateway.networking.k8s.io',
-                                                                   version='v1',
-                                                                   namespace=parent.parentRef.namespace,
-                                                                   plural='gateways',
-                                                                   name=parent.parentRef.name)
-                gateway = Gateway.model_validate(gtw)
-                port = gateway.listener_by_section_name(
-                    section_name=parent.parentRef.sectionName).port or 80
-                rec.address_ports = [NSAddressPort(ip_addresses=gateway.addresses(), port=port)]
-                await self._record_registry.add_record(rec)
-                self._logger.info(f'[{http_route}] Modified HTTPRoute')
+        for parent in http_route.status.parents:
+            gateway = await self._find_gateway(parent)
+            parent_spec = http_route.spec_parent_by_status_parent_ref(parent)
+            port = self._find_port(gateway, parent_spec)
+            for hostname in http_route.spec.hostnames:
+                for ip_address in gateway.addresses():
+                    for ns in self._nameservers:
+                        await ns.modify(Record(hostname=hostname,
+                                               ip_address=ip_address,
+                                               port=port))
+            self._logger.info(f'[{http_route}] Modified HTTPRoute')
 
     async def remove(self, event):
         http_route = HTTPRoute.model_validate(event['object'])
-        auth_known_recs = self._record_registry.by_owner(http_route.metadata.namespace,
-                                                         http_route.metadata.name)
-        for rec in auth_known_recs:
-            await self._record_registry.remove_record(rec)
+        for parent in http_route.status.parents:
+            gateway = await self._find_gateway(parent)
+            parent_spec = http_route.spec_parent_by_status_parent_ref(parent)
+            port = self._find_port(gateway, parent_spec)
+            for hostname in http_route.spec.hostnames:
+                for ip_address in gateway.addresses():
+                    for ns in self._nameservers:
+                        await ns.remove(Record(hostname=hostname,
+                                               ip_address=ip_address,
+                                               port=port))
             self._logger.info(f'[{http_route}] Removed HTTPRoute')
 
     async def run(self):
