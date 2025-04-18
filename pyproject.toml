@@ -42,6 +42,9 @@ namespaces = true
 [project.scripts]
 cloud-provider-mdns = "cloud_provider_mdns.cli:run"
 
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = 'session'
+
 [tool.mypy]
 plugins = [ 'pydantic.mypy' ]
 
