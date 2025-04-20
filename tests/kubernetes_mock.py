@@ -127,7 +127,7 @@ class KubernetesMockFactory:
         return MockWatch()
     
     @staticmethod
-    def patch_kubernetes(monkeypatch):
+    def patch_kubernetes(monkeypatch) -> dict[str, MockApisApi | MockCustomObjectsApi | MockNetworkingV1Api | MockWatch | MagicMock]:
         """Patch the kubernetes_asyncio module with mock implementations."""
         # Create mock instances
         mock_apis_api = KubernetesMockFactory.create_apis_api()

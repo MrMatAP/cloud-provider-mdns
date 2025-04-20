@@ -311,7 +311,7 @@ class BaseNameserver:
 
     def __init__(self, *args, **kwargs) -> None:
         self._logger = logging.getLogger(self.__class__.__name__)
-        self._records: typing.Set[Record] = ()
+        self.records: typing.Set[Record] = ()
 
     async def shutdown(self):
         pass
