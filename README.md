@@ -1,28 +1,24 @@
-# cloud-provider-mdns
+# Cloud Provider :: mDNS
 
-A cloud provider to register services exposed by your cluster in Multicast DNS.
+[![Build](https://github.com/MrMatOrg/cloud-provider-mdns/actions/workflows/build.yml/badge.svg)](https://github.com/MrMatOrg/cloud-provider-mdns/actions/workflows/build.yml)
 
-This is a proof of concept that it is possible to maintain human-readable names in Multicast DNS based on mere
-declarations of such names in Kubernetes resources, pointing to the edge on which it exposes those resources. It is
-intended to simplify local development, without the need of running a DNS server or manually hacking your hosts file.
+> This is a proof of concept. Do not consider it to be free of issues. It works reasonably well for registering names
+> in your local Kubernetes cluster you use for engineering, such as the one created by [kube-eng](https://github.com/mrmatap/kube-eng).
 
-Basically run this, watch it find resources, then type them into your browser.
-
-Your Kubernetes cluster will have some form of traffic routing implementation to expose services to you. The typical
-methods of doing that are:
-
-* A service of type Loadbalancer  
-  Such services may receive an IP address from your cloud provider or tools such as [cloud-provider-kind](https://github.com/kubernetes-sigs/cloud-provider-kind). Their result is an accessible IP address you can use to directly interact with the service to which that IP is assigned. If you wish to use some human-readable name then you must edit your hosts file or register that IP address in DNS. If the IP address changes you must do so again. While this tool could register that IP address for you in mDNS, it would have to do so by evaluating some label or annotation and it doesn't currently do this, so **this doesn't work yet**.
-* An Ingress Controller at the edge and Ingress resources exposing individual apps  
-  The Ingress controller will expose itself using some IP address which it usually obtains by exposing a service of type Loadbalancer itself. Individual apps then associate themselves with that Ingress controller via an Ingress resource that defines the FQDN they want to be reachable as. **This works more or less**.
-* The new [Kubernetes Gateway API](https://gateway-api.sigs.k8s.io) at the endge and HTTPRoutes exposing individual apps  
-  The Kubernetes Gateway API is an abstraction of Ingress (actually including the scenario and replacing the Ingress resource with its HTTP and GRPCRoutes). The FQDN individual apps are exposed with is defined in the HTTPRoute and GRPCRoutes analogue to the Ingress resource). **This works**.
+This little Python script watches for Gateways and HTTP Routes part of the [Kubernetes Gateway API](https://gateway-api.sigs.k8s.io)
+in the Kubernetes cluster you have configured as your current context. It then works out the hostname from the HTTP route
+and registers it in multicast DNS towards the IP address of the Gateway. cloud-provider-mdns is intended to simplify 
+local engineering, without the need of running a DNS server or manually hacking your hosts file. Basically run this, 
+watch it find new registrations, then type their names into your browser.
 
 ## How to run this
 
-1. One-time: Build and install as described in the "How to build this" section below. 
+> It is assumed you have something like [cloud-provider-kind](https://github.com/kubernetes-sigs/cloud-provider-kind)
+> that assigns IP addresses to your Gateways so they are accessible from your host.
+
+1. One-time: Build and install as described in the “How to build this” section below.
 2. Start your Kubernetes cluster and make sure your Kubernetes configuration has it set as its current context
-3. In a separate terminal, start this tool and keep it running. Hit Ctrl-C to stop it.
+3. In a separate terminal, start cloud-provider-mdns and keep it running. Hit Ctrl-C to stop it.
 
 ```shell
 $ /path/to/virtualenv/bin/cloud-provider-mdns
@@ -30,7 +26,7 @@ $ /path/to/virtualenv/bin/cloud-provider-mdns
 
 > It is not necessary to activate the virtual environment you installed the script in.
 
-4. Declare an Ingress or a HTTPRoute with a hostname that ends in '.local'
+4. Declare a HTTPRoute with a hostname that ends in '.local'
 5. Watch the output of cloud-provider-mdns
 6. Type the name into your browser
 
@@ -57,55 +53,73 @@ It is best to install the script into the virtual environment. If you do not lik
 virtual environment and install into whatever your Python considers the user installation directory. On Linux, that
 directory is going to be `~/.local`. On MacOs it's `~/Library/Python/<Python Version>`. If you don't like that either,
 you can permanently set the PYTHONUSERBASE environment variable to wherever things are to be installed. Current Python
-is very picky about you installing outside a virtual environment, so you must specify the `--user` and 
-`--break-system-packages` options to pip when doing that. 
+is very picky about you installing outside a virtual environment, so you must specify the `--user` and
+`--break-system-packages` options to pip when doing that.
 
 ## Issues & Limitations
 
-* There is currently no testsuite
-* This has been tested on a Mac, Docker, kind, Istio and the new Kubernetes Gateway API
-* This has been tested on a Mac, Docker Desktop Kubernetes and an nginx Ingress Controller
-* There is an unclean shut down of the watch client session when cancelling the watch task
-* The new Kubernetes Gateway API is not part of the mainline Kubernetes client API. See below how to generate model classes for it
-* Ingress controllers sometimes take quite a bit of time to reconfigure themselves. Ingresses without a controller assigned are ignored until the next update cycle
+* This has been tested on a Mac, Docker, cloud-provider-kind, Istio and the new Kubernetes Gateway API
+* There are some unclean shutdowns
 
 ## Notes
 
-### How to generate your own Kubernetes client.
+### Gateway API Complexities
 
-The Kubernetes Gateway API is not yet part of the Kubernetes Python API distribution in version 31.0.0. 
-That client API is generated using [openapi-generator](https://openapi-generator.tech).
+Applications within a cluster configured to use the Gateway API declare HTTPRoutes rather than Ingress resources.
+HTTPRoutes then "bind" to Gateway resources. Gateway resources may have multiple IP addresses and multiple listeners (for ports and TLS). 
 
-```shell
-$ brew install openapi-generator
-$ mkdir ~/build/k8s-api
-$ kubectl get --raw /openapi/v2 > ~/build/k8s-api/openapi.json
-$ openapi-generator generate -i k8s-api.json -g python -o ~/build/k8s-api
+A Gateway with multiple IP addresses and the names of a HTTPRoute registered against all those leads to round-robin
+behaviour in DNS, which is not ideal as it becomes non-deterministic which IP address (and
+therefore which Gateway IP address is resolved for the client. A realistic scenario where this is desirable is when you have a multi-homed cluster where, say, internal users are sent to one Gateway and external users to another. You would then register the same DNS name in different views or DNS servers. This scenario could be solved by this tool recognising an annotation on the Gateway resource explicitly declaring or overriding the DNS view or server that the desired name is to be registered in.
+
+A HTTPRoute by default binds to all listeners of a Gateway. The listener of a Gateway declares the port and protocol, but it re-uses the single IP address of that Gateway against which the names of the HTTPRoute are registered. HTTProutes
+can declare to be bound to a single listener via `sectionName` or `port`. The port binding is obvious when either of
+these is declared. When neither `sectionName` nor `port` is declared then this tool will assume port 443 (if the
+gateway has any listener on that port) or port 80. If neither port 443 nor port 80 is declared in the Gateways listener
+then the tool issues a warning and will not register the name in DNS.
+Clients that rely on session stickiness will not work.
+
+```mermaid
+---
+title: Gateway API
+---
+classDiagram
+    Host --|> LB : resolves hostname in DNS
+    LB --|> Gateway : tunnels traffic to the Gateway
+    Gateway --|> Service
+    Service --|> Pod
+    HTTPRoute "*" --o "*" Gateway : aggregates
+    
+    class Host {
+    }
+    
+    class LB {
+        string DNSName
+        ipaddress[] IPAddresses
+    }
+    
+    class Gateway {
+        string[] serviceNames
+        int[] ports
+        ipaddress[] IPAddresses
+    }
 ```
 
-Specifying /openapi/v2 in the kubectl get command above will fetch the entire OpenAPI definition of your cluster, with
-every CRD installed on it. If you take a look at what comes back for /openapi/v2 (or v3), you'll notice that it is a
-simple mapping between the CRD API and the URI that defines it. It is perfectly possible to just fetch the CRD-specific
-URI and generate client code just for that.
+#### One-To-One  
 
-### Watching custom resources using the native Kubernetes client
+A single HTTPRoute binds to a single Gateway. This is a simple case because all declared hostnames are registered
+against that single Gateway. However, the Gateway can have multiple addresses declared, which will lead to round-robin DNS entries. 
 
-The upstream Kubernetes client adds the watch and config package, which are not part of the client we generate using
-the method above. Worse, there are quite a few incompatibilities. The Watch.stream method forces 
-`_preload_content = False` in kwargs, which the newer generated (Pydantic) classes refuse to deserialise. It is also
-annoying to distribute a custom distribution of the API that just happens in your own cluster that doesn't necessarily
-exist in anyone elses. A better option is to accept that such resources are returned as dicts rather than being
-deserialised by the official Kubernetes client. Here is how you watch for such custom resources. If you still have the
-generated models then it is perfectly possible to cast the event object into such a model.
+The behaviour of this tool is to register all names declared in the HTTPRoute against all addresses of the Gateway in DNS.
 
-```python
-import kubernetes           # Upstream, official Kubernetes client
-import k8s_gateway_api      # Generated ourselves using the method above
-kubernetes.config.load_kube_config()
-api = kubernetes.client.CustomObjectsApi()
-w = kubernetes.watch.Watch()
-for event in w.stream(api.list_cluster_custom_object, 'gateway.networking.k8s.io', 'v1', 'gateways'):
-  print(event)
-  gtw = k8s_gateway_api.models.io_k8s_networking_gateway_v1_gateway.IoK8sNetworkingGatewayV1Gateway.model_validate(event['object'])
-```
+#### Many-To-One  
 
+Many HTTPRoutes bind to a single Gateway. This is a simple case because all declared hostnames are registered
+against the IP addresses of that single Gateway. This is the most common scenario. However, the Gateway can have multiple addresses declared, which will lead to round-robin DNS entries.
+
+The behaviour of this tool is to register all names declared in the HTTPRoute against all addresses of the Gateway in DNS.
+
+#### Many-To-Many 
+
+A single HTTPRoute binds to multiple Gateways. This is a more complex case because the declared hostnames are
+registered against the IP addresses of all Gateways. The tool will register the same hostname multiple times, for all IP addresses of all Gateways.
