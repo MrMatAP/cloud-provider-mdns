@@ -17,6 +17,12 @@ async def main() -> int:
                         required=False,
                         default='127.0.0.1',
                         help='IP address of the unicast resolver to update')
+    parser.add_argument('--domain',
+                        dest='domain',
+                        type=str,
+                        required=False,
+                        default='kube-eng.k8s',
+                        help='Domain for unicast DNS updates')
     parser.add_argument('--tsig-key',
                         dest='tsig_key',
                         type=str,
@@ -32,8 +38,11 @@ async def main() -> int:
 
     registry = Registry()
     mcast_ns = MulticastNameserver(registry=registry)
-    #ucast_ns = UnicastNameserver(registry=registry,
-    #                             ip=args.ip, key=args.tsig_key, secret=args.tsig_secret)
+    ucast_ns = UnicastNameserver(registry=registry,
+                                 ip=args.ip,
+                                 domain=args.domain,
+                                 key=args.tsig_key,
+                                 secret=args.tsig_secret)
     try:
         gw_watcher = GatewayWatcher(registry)
         route_watcher = HTTPRouteWatcher(registry)
@@ -49,6 +58,7 @@ async def main() -> int:
         return 0
     finally:
         await mcast_ns.shutdown()
+        await ucast_ns.shutdown()
 
 
 

@@ -81,45 +81,59 @@ class UnicastNameserver(BaseNameserver):
         super().__init__(registry)
         self._registered: typing.Set[Record] = set()
         self._keyring = None
+        self._ip = kwargs.get('ip', '127.0.0.1')
+        self._domain = kwargs.get('domain', 'kube-eng.k8s')
         if 'key' in kwargs and 'secret' in kwargs and kwargs['key'] is not None and kwargs['secret'] is not None:
             self._keyring = dns.tsigkeyring.from_text({kwargs['key']: kwargs['secret']})
 
+    async def shutdown(self):
+        """
+        Shutdown the nameserver
+        """
+        pass
+
     async def update(self, records: typing.Set[Record]):
+
+        # Filter out records that do not end in the local domain
+        local_records = set(filter(lambda r: r.fqdn.endswith(f'{self._domain}.'), records))
+
         # Remove records
-        for rec in records.difference(self._registered):
+        for rec in set(self._registered).difference(local_records):
             try:
-                update = dns.update.Update("nostromo.k8s", keyring=self._keyring)
+                update = dns.update.Update(self._domain, keyring=self._keyring)
                 update.delete(rec.fqdn, 300, "A", rec.ip_address)
-                response = dns.query.tcp(update, "127.0.0.1", timeout=10)
+                response = dns.query.tcp(update, self._ip, timeout=10)
                 if response.rcode() != dns.rcode.NOERROR:
                     self._logger.warning(f'Failed to remove {rec.fqdn}')
                 else:
-                    self._logger.info(f'Removed {rec.fqdn}.nostromo.k8s')
+                    self._logger.info(f'Removed {rec.fqdn}')
+                    self._registered.remove(rec)
             except dns.exception.DNSException as de:
-                self._logger.warning(f'Exception while removing {rec.fqdn}')
+                self._logger.warning(f'Exception while removing {rec.fqdn}: {de}')
 
         # Add records
-        for rec in records.difference(self._registered):
+        for rec in local_records.difference(self._registered):
             try:
-                add = dns.update.Update("nostromo.k8s", keyring=self._keyring)
+                add = dns.update.Update(self._domain, keyring=self._keyring)
                 add.replace(rec.fqdn, 300, "A", rec.ip_address)
-                response = dns.query.tcp(add, "127.0.0.1", timeout=10)
+                response = dns.query.tcp(add, self._ip, timeout=10)
                 if response.rcode() != dns.rcode.NOERROR:
                     self._logger.warning(f'Failed to add {rec.fqdn}')
                 else:
-                    self._logger.info(f'Added {rec.fqdn}.nostromo.k8s')
+                    self._logger.info(f'Added {rec.fqdn}')
+                    self._registered.add(rec)
             except dns.exception.DNSException as de:
-                self._logger.warning(f'Exception while adding {rec.fqdn}')
+                self._logger.warning(f'Exception while adding {rec.fqdn}: {de}')
 
         # Modify records
-        for rec in set(self._registered).intersection(records):
+        for rec in set(self._registered).intersection(local_records):
             try:
-                update = dns.update.Update("nostromo.k8s", keyring=self._keyring)
+                update = dns.update.Update(self._domain, keyring=self._keyring)
                 update.replace(rec.fqdn, 300, "A", rec.ip_address)
-                response = dns.query.tcp(update, "127.0.0.1", timeout=10)
+                response = dns.query.tcp(update, self._ip, timeout=10)
                 if response.rcode() != dns.rcode.NOERROR:
                     self._logger.warning(f'Failed to modify {rec.fqdn}')
                 else:
-                    self._logger.info(f'Modified {rec.fqdn}.nostromo.k8s')
+                    self._logger.info(f'Modified {rec.fqdn}')
             except dns.exception.DNSException as de:
-                self._logger.warning(f'Exception while modifying {rec.fqdn}')
+                self._logger.warning(f'Exception while modifying {rec.fqdn}: {de}')
