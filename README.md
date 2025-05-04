@@ -7,7 +7,7 @@
 
 This little Python script watches for Gateways and HTTP Routes part of the [Kubernetes Gateway API](https://gateway-api.sigs.k8s.io)
 in the Kubernetes cluster you have configured as your current context. It then works out the hostname from the HTTP route
-and registers it in multicast DNS towards the IP address of the Gateway. cloud-provider-mdns is intended to simplify 
+and registers it in multicast and optionally unicast DNS towards the IP address of the Gateway. cloud-provider-mdns is intended to simplify 
 local engineering, without the need of running a DNS server or manually hacking your hosts file. Basically run this, 
 watch it find new registrations, then type their names into your browser.
 
@@ -15,20 +15,23 @@ watch it find new registrations, then type their names into your browser.
 
 > It is assumed you have something like [cloud-provider-kind](https://github.com/kubernetes-sigs/cloud-provider-kind)
 > that assigns IP addresses to your Gateways so they are accessible from your host.
+> It is not necessary to activate the virtual environment you installed the script in.
 
 1. One-time: Build and install as described in the “How to build this” section below.
 2. Start your Kubernetes cluster and make sure your Kubernetes configuration has it set as its current context
 3. In a separate terminal, start cloud-provider-mdns and keep it running. Hit Ctrl-C to stop it.
 
-```shell
-$ /path/to/virtualenv/bin/cloud-provider-mdns
-```
-
-> It is not necessary to activate the virtual environment you installed the script in.
-
+    ```shell
+    $ /path/to/virtualenv/bin/cloud-provider-mdns
+    ```
+   
 4. Declare a HTTPRoute with a hostname that ends in '.local'
 5. Watch the output of cloud-provider-mdns
 6. Type the name into your browser
+
+Registration is done in multicast DNS by default. If you wish to additionally populate a unicast nameserver then
+you must specify it's IP, tsig key name and secret using the CLI. A usable example unicast namesever configuration is created
+by [kube-eng](https://github.com/mrmatap/kube-eng).
 
 ## How to build this
 
