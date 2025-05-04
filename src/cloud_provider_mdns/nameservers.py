@@ -48,7 +48,7 @@ class MulticastNameserver(BaseNameserver):
                     '_http._tcp.local.',
                     svc_fqdn,
                     port=rec.port,  # Port is required by Apple, apparently
-                    addresses=[rec.ip_address],
+                    addresses=[ipaddress.ip_address(rec.ip_address).packed],
                     server=rec.fqdn)
                 await self._aiozc.async_register_service(si, allow_name_change=True)
                 self._registered[rec] = si
@@ -67,7 +67,7 @@ class MulticastNameserver(BaseNameserver):
             old_ip = ipaddress.ip_interface(si.addresses[0])
             new_ip = ipaddress.ip_interface(rec.ip_address)
             if old_ip.ip != new_ip.ip:
-                si.addresses = [rec.ip_address]
+                si.addresses = [new_ip.packed]
                 self._logger.info(f'Modified IP address from {old_ip} to {new_ip} for {rec.owner_id}')
             await self._aiozc.async_update_service(si)
 

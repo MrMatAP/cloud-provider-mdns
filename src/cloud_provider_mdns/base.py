@@ -4,7 +4,7 @@ import typing
 import dataclasses
 import logging
 
-import kubernetes_asyncio as kubernetes
+import kubernetes_asyncio as kubernetes     # type: ignore[import-untyped]
 import pydantic
 
 
@@ -132,8 +132,7 @@ class Gateway(PydanticIgnoreExtraFields):
         """
         Get the IP addresses for the Gateway
         """
-        return [address.value for address in self.status.addresses \
-                if address.type == 'IPAddress']
+        return [address.value for address in self.status.addresses if address.type == 'IPAddress']
 
     def listens_on_port(self, port: int) -> bool:
         """

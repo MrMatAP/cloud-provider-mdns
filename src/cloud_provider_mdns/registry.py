@@ -1,13 +1,14 @@
 import typing
 import logging
-import kubernetes_asyncio
+
+import kubernetes_asyncio       # type: ignore[import-untyped]
 
 from cloud_provider_mdns.base import Gateway, HTTPRoute, Record, BaseNameserver
 
 
 class Registry:
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._logger = logging.getLogger(self.__class__.__name__)
         self._gateways: typing.Dict[str, Gateway] = {}
         self._routes: typing.Dict[str, HTTPRoute] = {}
@@ -136,7 +137,7 @@ class Registry:
             del self._ingresses[resource_id]
         await self._notify_subscribers()
 
-    def records(self, domain: str = None) -> typing.Set[Record]:
+    def records(self, domain: str | None = None) -> typing.Set[Record]:
         if domain is None:
             return self._records
         return set(filter(lambda r: r.fqdn.endswith(domain), self._records))

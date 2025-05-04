@@ -2,7 +2,7 @@ import sys
 import argparse
 import asyncio
 
-import kubernetes_asyncio as kubernetes
+import kubernetes_asyncio as kubernetes     # type: ignore[import-untyped]
 
 from cloud_provider_mdns.registry import Registry
 from cloud_provider_mdns.watchers import HTTPRouteWatcher, GatewayWatcher
@@ -40,6 +40,7 @@ async def main() -> int:
         async with asyncio.TaskGroup() as tg:
             gw_watcher_task = tg.create_task(gw_watcher.run())
             route_watcher_task = tg.create_task(route_watcher.run())
+        return 0
     except asyncio.CancelledError:
         print('Shut down')
         return 0
@@ -47,7 +48,6 @@ async def main() -> int:
         print('Keyboard interrupt, shutting down')
         return 0
     finally:
-        #await ucast_ns.shutdown()
         await mcast_ns.shutdown()
 
 

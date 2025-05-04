@@ -1,6 +1,6 @@
 import asyncio
 
-import kubernetes_asyncio as kubernetes
+import kubernetes_asyncio as kubernetes     # type: ignore[import-untyped]
 from pydantic import ValidationError
 
 from cloud_provider_mdns.base import \
