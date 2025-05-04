@@ -132,7 +132,8 @@ class Gateway(PydanticIgnoreExtraFields):
         """
         Get the IP addresses for the Gateway
         """
-        return [address.value for address in self.status.addresses if address.type == 'IPAddress']
+        return [address.value for address in self.status.addresses
+                if address.type == 'IPAddress' and address.value is not None]
 
     def listens_on_port(self, port: int) -> bool:
         """
