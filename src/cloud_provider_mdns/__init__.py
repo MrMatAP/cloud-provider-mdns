@@ -9,7 +9,7 @@ except importlib.metadata.PackageNotFoundError:
     # You have not yet installed this as a package, likely because you're hacking on it in some IDE
     __version__ = "0.0.0.dev0"
 
-console = rich.console.Console(log_time=False, log_path=False)
+console = rich.console.Console(log_time=True, log_path=False, width=120)
 
 __log_config__ = {
     "version": 1,

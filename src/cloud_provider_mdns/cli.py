@@ -4,7 +4,8 @@ import asyncio
 
 import kubernetes_asyncio as kubernetes
 
-from cloud_provider_mdns.watchers import HTTPRouteWatcher
+from cloud_provider_mdns.registry import Registry
+from cloud_provider_mdns.watchers import HTTPRouteWatcher, GatewayWatcher
 from cloud_provider_mdns.nameservers import MulticastNameserver, UnicastNameserver
 
 
@@ -28,19 +29,25 @@ async def main() -> int:
                         help='TSIG secret')
     args = parser.parse_args(sys.argv[1:])
     await kubernetes.config.load_kube_config()
-    mcast_ns = MulticastNameserver()
-    ucast_ns = UnicastNameserver(ip=args.ip, key=args.tsig_key, secret=args.tsig_secret)
+
+    registry = Registry()
+    mcast_ns = MulticastNameserver(registry=registry)
+    #ucast_ns = UnicastNameserver(registry=registry,
+    #                             ip=args.ip, key=args.tsig_key, secret=args.tsig_secret)
     try:
-        http_route_watcher = HTTPRouteWatcher([mcast_ns, ucast_ns])
-        #ingress_watcher = IngressWatcher(record_registry)
+        gw_watcher = GatewayWatcher(registry)
+        route_watcher = HTTPRouteWatcher(registry)
         async with asyncio.TaskGroup() as tg:
-            http_route_watcher_task = tg.create_task(http_route_watcher.run())
-            #ingress_watcher_task = tg.create_task(ingress_watcher.run())
+            gw_watcher_task = tg.create_task(gw_watcher.run())
+            route_watcher_task = tg.create_task(route_watcher.run())
     except asyncio.CancelledError:
         print('Shut down')
         return 0
+    except KeyboardInterrupt:
+        print('Keyboard interrupt, shutting down')
+        return 0
     finally:
-        await ucast_ns.shutdown()
+        #await ucast_ns.shutdown()
         await mcast_ns.shutdown()
 
 

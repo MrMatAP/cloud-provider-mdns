@@ -1,5 +1,4 @@
 import abc
-import enum
 import asyncio
 import typing
 import dataclasses
@@ -142,13 +141,13 @@ class Gateway(PydanticIgnoreExtraFields):
         """
         return any(listener.port == port for listener in self.spec.listeners)
 
-    def port_by_section_name(self, section_name: str) -> int:
+    def port_by_section_name(self, section_name: str) -> int | None:
         """
         Return the port for a given section name
         """
-        section = list(filter(lambda s: s.sectionName == section_name, self.spec.listeners))
+        section = list(filter(lambda s: s.name == section_name, self.spec.listeners))
         if len(section) == 0:
-            raise ValueError(f'No section name found for {section_name}')
+            return None
         return section[0].port
 
     def __str__(self) -> str:
@@ -160,9 +159,18 @@ class Record:
     """
     A record we maintain in multicast and/or unicast DNS
     """
+    owner_id: str
+    gateway_id: str
     hostname: str
     ip_address: str
-    port: int = dataclasses.field(default=443)
+    port: int = dataclasses.field(default=80)
+
+    @property
+    def unqualified(self):
+        """
+        Return the unqualified hostname without its domain
+        """
+        return self.hostname.replace(f'.{self.domain}','')
 
     @property
     def fqdn(self) -> str:
@@ -179,35 +187,6 @@ class Record:
         The domain of the record
         """
         return self.hostname.split('.')[-1]
-
-
-class NSRecordUpdate(enum.Enum):
-    ADD = enum.auto()
-    MODIFY = enum.auto()
-    REMOVE = enum.auto()
-
-@dataclasses.dataclass
-class NSAddressPort:
-    port: int
-    ip_addresses: typing.List[str] = dataclasses.field(default_factory=list)
-
-@dataclasses.dataclass(unsafe_hash=True)
-class NSRecord:
-    namespace: str
-    name: str
-    hostname: str
-    action: NSRecordUpdate | None = dataclasses.field(default=None, hash=False)
-    address_ports: typing.List[NSAddressPort] = dataclasses.field(default_factory=list, hash=False)
-
-    @property
-    def fqdn(self) -> str:
-        return self.hostname if self.hostname.endswith('.') else f'{self.hostname}.'
-
-    def is_owner(self, namespace: str, name: str) -> bool:
-        return self.namespace == namespace and self.name == name
-
-    def __str__(self) -> str:
-        return f'{self.namespace}/{self.name}'
 
 
 class BaseTask(abc.ABC):
@@ -239,32 +218,6 @@ class BaseTask(abc.ABC):
         The asynchronous run method performs lengthy tasks
         """
         pass
-
-
-@dataclasses.dataclass()
-class ResourceId:
-    namespace: str
-    name: str
-
-    @staticmethod
-    def from_resource(obj: dict) -> 'ResourceId':
-        namespace = obj.get('metadata', {}).get('namespace', None)
-        name = obj.get('metadata', {}).get('name', None)
-        if namespace is None or name is None:
-            raise UnidentifiableResourceException(code=400,
-                                                  msg='The provided resource cannot be identified '
-                                                      'since it has no namespace or name')
-        return ResourceId(namespace=namespace, name=name)   # noqa
-
-    @property
-    def id(self) -> str:
-        return f'{self.namespace}/{self.name}'
-
-    def __str__(self) -> str:
-        return self.id
-
-    def __repr__(self) -> str:
-        return f'{self.__class__.__name__}({self.namespace}, {self.name})'
 
 
 class CPMException(Exception):
@@ -309,11 +262,15 @@ class BaseNameserver:
     Common Nameserver implementation
     """
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, registry: 'Registry', *args, **kwargs) -> None:
         self._logger = logging.getLogger(self.__class__.__name__)
-        self.records: typing.Set[Record] = ()
+        self._registry = registry
+        self._registry.subscribe(self)
 
     async def shutdown(self):
+        pass
+
+    async def update(self, records: typing.Set[Record]):
         pass
 
     async def add(self, rec: Record):
@@ -328,21 +285,12 @@ class BaseNameserver:
 
 class BaseWatcher(BaseTask):
 
-    def __init__(self, nameservers: typing.Set[BaseNameserver]) -> None:
+    def __init__(self, registry: 'Registry') -> None:
         super().__init__()
-        self._nameservers: typing.Set[BaseNameserver] = nameservers or {}
+        self._registry = registry
         self._watch = kubernetes.watch.Watch()
 
     async def run(self):
-        raise NotImplementedError
-
-    async def add(self, event):
-        raise NotImplementedError
-
-    async def modify(self, event):
-        raise NotImplementedError
-
-    async def remove(self, event):
         raise NotImplementedError
 
     @staticmethod
