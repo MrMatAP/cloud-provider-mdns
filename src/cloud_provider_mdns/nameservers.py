@@ -83,6 +83,8 @@ class UnicastNameserver(BaseNameserver):
         self._keyring = None
         self._ip = kwargs.get('ip', '127.0.0.1')
         self._domain = kwargs.get('domain', 'kube-eng.k8s')
+        if not self._domain.endswith('.'):
+            self._domain += '.'
         if 'key' in kwargs and 'secret' in kwargs and kwargs['key'] is not None and kwargs['secret'] is not None:
             self._keyring = dns.tsigkeyring.from_text({kwargs['key']: kwargs['secret']})
 
@@ -95,7 +97,7 @@ class UnicastNameserver(BaseNameserver):
     async def update(self, records: typing.Set[Record]):
 
         # Filter out records that do not end in the local domain
-        local_records = set(filter(lambda r: r.fqdn.endswith(f'{self._domain}.'), records))
+        local_records = set(filter(lambda r: r.fqdn.endswith(f'{self._domain}'), records))
 
         # Remove records
         for rec in set(self._registered).difference(local_records):
@@ -106,24 +108,10 @@ class UnicastNameserver(BaseNameserver):
                 if response.rcode() != dns.rcode.NOERROR:
                     self._logger.warning(f'Failed to remove {rec.fqdn}')
                 else:
-                    self._logger.info(f'Removed {rec.fqdn}')
+                    self._logger.info(f'{rec.owner_id} removes {rec.fqdn}')
                     self._registered.remove(rec)
             except dns.exception.DNSException as de:
                 self._logger.warning(f'Exception while removing {rec.fqdn}: {de}')
-
-        # Add records
-        for rec in local_records.difference(self._registered):
-            try:
-                add = dns.update.Update(self._domain, keyring=self._keyring)
-                add.replace(rec.fqdn, 300, "A", rec.ip_address)
-                response = dns.query.tcp(add, self._ip, timeout=10)
-                if response.rcode() != dns.rcode.NOERROR:
-                    self._logger.warning(f'Failed to add {rec.fqdn}')
-                else:
-                    self._logger.info(f'Added {rec.fqdn}')
-                    self._registered.add(rec)
-            except dns.exception.DNSException as de:
-                self._logger.warning(f'Exception while adding {rec.fqdn}: {de}')
 
         # Modify records
         for rec in set(self._registered).intersection(local_records):
@@ -134,6 +122,20 @@ class UnicastNameserver(BaseNameserver):
                 if response.rcode() != dns.rcode.NOERROR:
                     self._logger.warning(f'Failed to modify {rec.fqdn}')
                 else:
-                    self._logger.info(f'Modified {rec.fqdn}')
+                    self._logger.info(f'{rec.owner_id} modifies {rec.fqdn} with IP {rec.ip_address}')
             except dns.exception.DNSException as de:
                 self._logger.warning(f'Exception while modifying {rec.fqdn}: {de}')
+
+        # Add records
+        for rec in local_records.difference(self._registered):
+            try:
+                add = dns.update.Update(self._domain, keyring=self._keyring)
+                add.replace(rec.fqdn, 300, "A", rec.ip_address)
+                response = dns.query.tcp(add, self._ip, timeout=10)
+                if response.rcode() != dns.rcode.NOERROR:
+                    self._logger.warning(f'Failed to add {rec.fqdn}')
+                else:
+                    self._logger.info(f'{rec.owner_id} adds {rec.fqdn} with {rec.ip_address}')
+                    self._registered.add(rec)
+            except dns.exception.DNSException as de:
+                self._logger.warning(f'Exception while adding {rec.fqdn}: {de}')

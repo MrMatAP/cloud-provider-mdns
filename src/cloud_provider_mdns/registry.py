@@ -17,6 +17,26 @@ class Registry:
         self._records: typing.Set[Record] = set()
         self._subscribers: typing.Set[BaseNameserver] = set()
 
+    async def add_record(self, record: Record):
+        self._records.add(record)
+        await self._notify_subscribers()
+        self._logger.info(f'{record.owner_id} adds {record.hostname}')
+
+    async def modify_record(self, record: Record):
+        current = list(filter(lambda r: r.owner_id == record.owner_id and r.hostname == record.hostname, self._records))
+        if len(current) == 0:
+            await self.add_record(record)
+            return
+        self._records.remove(current[0])
+        self._records.add(record)
+        await self._notify_subscribers()
+        self._logger.info(f'{record.owner_id} updates {record.hostname}')
+
+    async def remove_record(self, record: Record):
+        self._records.remove(record)
+        await self._notify_subscribers()
+        self._logger.info(f'{record.owner_id} removes {record.hostname}')
+
     async def add_gateway(self, gateway: Gateway):
         gateway_id = f'{gateway.metadata.namespace}/{gateway.metadata.name}'
         if gateway_id in self._gateways:

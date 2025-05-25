@@ -7,4 +7,5 @@ kubernetes_asyncio==32.0.0       # Apache 2.0
 pyyaml==6.0.2                    # MIT
 zeroconf==0.146.5                # LPGL-2.1-or-later
 pydantic==2.10.3                 # MIT
+pydantic_settings==2.9.1         # MIT
 dnspython==2.7.0                 # ISC

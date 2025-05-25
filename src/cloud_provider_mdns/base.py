@@ -160,9 +160,9 @@ class Record:
     A record we maintain in multicast and/or unicast DNS
     """
     owner_id: str
-    gateway_id: str
     hostname: str
     ip_address: str
+    gateway_id: str = dataclasses.field(default='0.0.0.0')
     port: int = dataclasses.field(default=80)
 
     @property
