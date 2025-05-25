@@ -20,7 +20,7 @@ class Settings(pydantic_settings.BaseSettings):
                                                         cli_kebab_case=True,
                                                         cli_enforce_required=True,
                                                         env_prefix='CLOUD_PROVIDER_MDNS_')
-    multicast_enable: pydantic_settings.CliImplicitFlag[bool] = pydantic.Field(default=False,
+    multicast_enable: pydantic_settings.CliImplicitFlag[bool] = pydantic.Field(default=True,
                                                                                description='Enable multicast DNS updates')
     unicast_enable: pydantic_settings.CliImplicitFlag[bool] = pydantic.Field(default=False,
                                                                              description='Enable unicast DNS updates')
