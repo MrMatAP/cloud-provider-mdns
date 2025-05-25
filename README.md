@@ -5,10 +5,9 @@
 > This is a proof of concept. Do not consider it to be free of issues. It works reasonably well for registering names
 > in your local Kubernetes cluster you use for engineering, such as the one created by [kube-eng](https://github.com/mrmatap/kube-eng).
 
-This little Python script watches for Gateways and HTTP Routes part of the [Kubernetes Gateway API](https://gateway-api.sigs.k8s.io)
-in the Kubernetes cluster you have configured as your current context. It then works out the hostname from the HTTP route
-and registers it in multicast and optionally unicast DNS towards the IP address of the Gateway. cloud-provider-mdns is intended to simplify 
-local engineering, without the need of running a DNS server or manually hacking your hosts file. Basically run this, 
+This little Python script watches for Ingresses, Gateways and HTTP Routes in the Kubernetes cluster you have configured as your current context.
+.  It then works out the fully qualified domain name and external IP address to be registered it in multicast and/or unicast DNS towards the IP. cloud-provider-mdns is intended to simplify 
+local engineering. If you choose to only use Multicast DNS only then there is no need to run a local DNS server. Basically run this, 
 watch it find new registrations, then type their names into your browser.
 
 ## How to run this
@@ -25,13 +24,28 @@ watch it find new registrations, then type their names into your browser.
     $ /path/to/virtualenv/bin/cloud-provider-mdns
     ```
    
-4. Declare a HTTPRoute with a hostname that ends in '.local'
+4. Declare a HTTPRoute with a hostname that ends in '.local' or an Ingress, depending on how your cluster is configured
 5. Watch the output of cloud-provider-mdns
 6. Type the name into your browser
 
 Registration is done in multicast DNS by default. If you wish to additionally populate a unicast nameserver then
 you must specify it's IP, tsig key name and secret using the CLI. A usable example unicast namesever configuration is created
 by [kube-eng](https://github.com/mrmatap/kube-eng).
+
+### Configuration
+
+You can configure cloud-provider-mdns by providing a configuration file at `~/etc/cloud-provider-mdns.json` or using
+environment variables.
+
+| Field              | Environment Variable                 | Default Value | Description                                                                                                                                                                 |
+|--------------------|--------------------------------------|---------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| multicast_enable   | CLOUD_PROVIDER_MDNS_MULTICAST_ENABLE | True          | Enables registration in multicast DNS **for names that end in `.local`**                                                                                                    |
+| unicast_enable     | CLOUD_PROVIDER_MDNS_UNICAST_ENABLE   | False         | Enables registration in unicast DNS **for all names that end in the specified domain**                                                                                      |
+| unicast_ip         | CLOUD_PROVIDER_MDNS_UNICAST_IP       | 127.0.0.1     | IP address on which the Unicast DNS server listens on for DDNS updates                                                                                                      |
+| unicast_domain     | CLOUD_PROVIDER_MDNS_UNICAST_DOMAIN   | k8s           | DNS Domain to update. This the zone name the unicast DNS server is authoritative for. The FQDNs to be registered can be anything, including subdomains of that domain name. |
+| unicast_key_name   | CLOUD_PROVIDER_MDNS_KEY_NAME         | <empty>       | Name of the TSIG key authorised to update the unicast_domain                                                                                                                |
+| unicast_key_secret | CLOUD_PROVIDER_MDNS_KEY_SECRET       | <empty>       | The TSIG key authorised to update the unicast_domain                                                                                                                        |
+
 
 ## How to build this
 
