@@ -24,12 +24,12 @@ watch it find new registrations, then type their names into your browser.
     $ /path/to/virtualenv/bin/cloud-provider-mdns
     ```
    
-4. Declare a HTTPRoute with a hostname that ends in '.local' or an Ingress, depending on how your cluster is configured
+4. Declare a HTTPRoute, Ingress or VirtualService
 5. Watch the output of cloud-provider-mdns
 6. Type the name into your browser
 
 Registration is done in multicast DNS by default. If you wish to additionally populate a unicast nameserver then
-you must specify it's IP, tsig key name and secret using the CLI. A usable example unicast namesever configuration is created
+you must specify it's IP, tsig key name and secret using the CLI. A usable example unicast nameserver configuration is created
 by [kube-eng](https://github.com/mrmatap/kube-eng).
 
 ### Configuration

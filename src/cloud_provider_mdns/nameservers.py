@@ -108,7 +108,7 @@ class UnicastNameserver(BaseNameserver):
                 if response.rcode() != dns.rcode.NOERROR:
                     self._logger.warning(f'Failed to remove {rec.fqdn}')
                 else:
-                    self._logger.info(f'{rec.owner_id} removes {rec.fqdn}')
+                    self._logger.info(f'Record {rec.owner_id} removes {rec.fqdn} on {rec.ip_address}')
                     self._registered.remove(rec)
             except dns.exception.DNSException as de:
                 self._logger.warning(f'Exception while removing {rec.fqdn}: {de}')
@@ -122,7 +122,7 @@ class UnicastNameserver(BaseNameserver):
                 if response.rcode() != dns.rcode.NOERROR:
                     self._logger.warning(f'Failed to modify {rec.fqdn}')
                 else:
-                    self._logger.info(f'{rec.owner_id} modifies {rec.fqdn} with IP {rec.ip_address}')
+                    self._logger.info(f'Record {rec.owner_id} modifies {rec.fqdn} to {rec.ip_address}')
             except dns.exception.DNSException as de:
                 self._logger.warning(f'Exception while modifying {rec.fqdn}: {de}')
 
@@ -135,7 +135,7 @@ class UnicastNameserver(BaseNameserver):
                 if response.rcode() != dns.rcode.NOERROR:
                     self._logger.warning(f'Failed to add {rec.fqdn}')
                 else:
-                    self._logger.info(f'{rec.owner_id} adds {rec.fqdn} with {rec.ip_address}')
+                    self._logger.info(f'Record {rec.owner_id} adds {rec.fqdn} to {rec.ip_address}')
                     self._registered.add(rec)
             except dns.exception.DNSException as de:
                 self._logger.warning(f'Exception while adding {rec.fqdn}: {de}')

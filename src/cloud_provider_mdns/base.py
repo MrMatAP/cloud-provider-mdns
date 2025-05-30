@@ -1,5 +1,6 @@
 import abc
 import asyncio
+import enum
 import typing
 import dataclasses
 import logging
@@ -153,6 +154,38 @@ class Gateway(PydanticIgnoreExtraFields):
     def __str__(self) -> str:
         return f'{self.metadata.namespace}/{self.metadata.name}'
 
+class VirtualServiceSpec(PydanticIgnoreExtraFields):
+    """
+    Virtual Service Spec
+    """
+    gateways: typing.List[str] = pydantic.Field(default_factory=list)
+    hosts: typing.List[str] = pydantic.Field(default_factory=list)
+
+class VirtualService(PydanticIgnoreExtraFields):
+    """
+    A record for a VirtualService
+    """
+    apiVersion: str = pydantic.Field(default='networking.istio.io/v1')
+    kind: str = pydantic.Field(default='VirtualService')
+    metadata: ObjectMeta
+    spec: VirtualServiceSpec
+
+class NativeIstioGatewaySpec(PydanticIgnoreExtraFields):
+    """
+    A record for the native Istio Gateway spec
+    """
+    selector: typing.Dict[str, str] = pydantic.Field(default_factory=dict)
+
+class NativeIstioGateway(PydanticIgnoreExtraFields):
+    """
+    A record for a native Istio Gateway
+    """
+    apiVersion: str = pydantic.Field(default='networking.istio.io/v1')
+    kind: str = pydantic.Field(default='Gateway')
+    metadata: ObjectMeta
+    spec: NativeIstioGatewaySpec
+
+
 
 @dataclasses.dataclass(frozen=True)
 class Record:
@@ -282,7 +315,6 @@ class BaseNameserver:
     async def remove(self, rec: Record):
         raise NotImplementedError()
 
-
 class BaseWatcher(BaseTask):
 
     def __init__(self, registry: 'Registry') -> None:
@@ -292,6 +324,18 @@ class BaseWatcher(BaseTask):
 
     async def run(self):
         raise NotImplementedError
+
+    async def register_record(self, op: str, record: Record):
+        match op:
+            case 'ADDED':
+                await self._registry.add_record(record)
+                self._logger.info(f'Record {record.owner_id} adds {record.hostname}')
+            case 'MODIFIED':
+                await self._registry.modify_record(record)
+                self._logger.info(f'Record {record.owner_id} modifies {record.hostname}')
+            case 'DELETED':
+                await self._registry.remove_record(record)
+                self._logger.info(f'Record {record.owner_id} removes {record.hostname}')
 
     @staticmethod
     async def _has_api(required_api_name: str) -> bool:
