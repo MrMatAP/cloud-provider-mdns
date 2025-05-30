@@ -56,6 +56,7 @@ class VirtualServiceWatcher(BaseWatcher):
         if not await self._has_api(required_api_name='networking.istio.io'):
             self._logger.warning('Not watching for VirtualServices because the cluster you are connected to does not know them')
             return
+        self._logger.info('Watching for VirtualServices')
         try:
             while True:
                 async for event in self._watch.stream(self._api.list_cluster_custom_object,
