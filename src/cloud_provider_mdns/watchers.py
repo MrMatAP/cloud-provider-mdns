@@ -1,100 +1,14 @@
 import asyncio
 
 import kubernetes_asyncio as kubernetes     # type: ignore[import-untyped]
-from pydantic import ValidationError
 
-from cloud_provider_mdns.base import \
-    GatewayNotReadyException, UnidentifiableResourceException, HTTPRoute, Gateway, \
-    BaseWatcher, Record
+from cloud_provider_mdns.base import (
+    GatewayNotReadyException, UnidentifiableResourceException,
+    BaseWatcher, Record,
+    HTTPRoute, Gateway,
+    VirtualService, NativeIstioGateway )
 from cloud_provider_mdns.registry import Registry
 
-
-class GatewayWatcher(BaseWatcher):
-
-    def __init__(self, registry: Registry):
-        super().__init__(registry)
-        self._api = kubernetes.client.CustomObjectsApi()
-
-    async def run(self):
-        if not await self._has_api(required_api_name='gateway.networking.k8s.io'):
-            self._logger.warning('Not watching for Gateways because the cluster you are connected to does not know the Gateway API')
-            return
-        self._logger.info('Watching for Gateways')
-        try:
-            while True:
-                if self._should_stop:
-                    self._watch.stop()
-                    return
-                try:
-                    async for event in self._watch.stream(self._api.list_cluster_custom_object,
-                                                          'gateway.networking.k8s.io',
-                                                          'v1',
-                                                          'gateways'):
-                        gateway = Gateway.model_validate(event['object'])
-                        match event['type']:
-                            case 'ADDED':
-                                await self._registry.add_gateway(gateway)
-                            case 'MODIFIED':
-                                await self._registry.modify_gateway(gateway)
-                            case 'DELETED':
-                                await self._registry.remove_gateway(gateway)
-                except ValidationError as ve:
-                    self._logger.warning(ve)
-                except UnidentifiableResourceException as ur:
-                    self._logger.warning(ur)
-                except GatewayNotReadyException as gnre:
-                    self._logger.warning(gnre)
-                except kubernetes.client.exceptions.ApiException:
-                    self._logger.info('Kubernetes API error, restarting')
-        except asyncio.CancelledError:
-            self._logger.info('Stopping')
-            self._should_stop = True
-            await self._watch.close()
-            raise
-
-
-class HTTPRouteWatcher(BaseWatcher):
-
-    def __init__(self, registry: Registry):
-        super().__init__(registry)
-        self._api = kubernetes.client.CustomObjectsApi()
-
-    async def run(self):
-        if not await self._has_api(required_api_name='gateway.networking.k8s.io'):
-            self._logger.warning('Not watching for HTTPRoutes because the cluster you are connected to does not know the Gateway API.')
-            return
-        self._logger.info('Watching for HTTPRoutes')
-        try:
-            while True:
-                if self._should_stop:
-                    self._watch.stop()
-                    return
-                try:
-                    async for event in self._watch.stream(self._api.list_cluster_custom_object,
-                                                          'gateway.networking.k8s.io',
-                                                          'v1',
-                                                          'httproutes'):
-                        route = HTTPRoute.model_validate(event['object'])
-                        match event['type']:
-                            case 'ADDED':
-                                await self._registry.add_route(route)
-                            case 'MODIFIED':
-                                await self._registry.modify_route(route)
-                            case 'DELETED':
-                                await self._registry.remove_route(route)
-                except ValidationError as ve:
-                    self._logger.warning(ve)
-                except UnidentifiableResourceException as ur:
-                    self._logger.warning(ur)
-                except GatewayNotReadyException as gnre:
-                    self._logger.warning(gnre)
-                except kubernetes.client.exceptions.ApiException:
-                    self._logger.info('Kubernetes API error, restarting')
-        except asyncio.CancelledError:
-            self._logger.info('Stopping')
-            self._should_stop = True
-            await self._watch.close()
-            raise
 
 class IngressWatcher(BaseWatcher):
 
@@ -118,21 +32,73 @@ class IngressWatcher(BaseWatcher):
                                     hostname=ingress.spec.rules[0].host,
                                     ip_address=ingress.status.load_balancer.ingress[0].ip,
                                     port=80)
-                    match event['type']:
-                        case 'ADDED':
-                            self._logger.info(f'Discovered new ingress {record.owner_id} for hostname {record.hostname} pointing to {record.ip_address}:{record.port}')
-                            await self._registry.add_record(record)
-                        case 'MODIFIED':
-                            self._logger.info(f'Modified Ingress: {ingress.metadata.name}')
-                            await self._registry.modify_record(record)
-                        case 'DELETED':
-                            self._logger.info(f'Deleted Ingress: {ingress.metadata.name}')
-                            await self._registry.remove_record(record)
+                    await self.register_record(event['type'], record)
         except UnidentifiableResourceException as ur:
             self._logger.warning(ur)
         except GatewayNotReadyException as gnre:
             self._logger.warning(gnre)
         except kubernetes.client.exceptions.ApiException:
+            self._logger.info('Kubernetes API error, restarting')
+        except asyncio.CancelledError:
+            self._logger.info('Stopping')
+            self._should_stop = True
+            await self._watch.close()
+            raise
+
+class VirtualServiceWatcher(BaseWatcher):
+
+    def __init__(self, registry: Registry):
+        super().__init__(registry)
+        self._api = kubernetes.client.CustomObjectsApi()
+        self._core_api = kubernetes.client.CoreV1Api()
+
+    async def run(self):
+        if not await self._has_api(required_api_name='networking.istio.io'):
+            self._logger.warning('Not watching for VirtualServices because the cluster you are connected to does not know them')
+            return
+        try:
+            while True:
+                async for event in self._watch.stream(self._api.list_cluster_custom_object,
+                                                      'networking.istio.io',
+                                                      'v1',
+                                                      'virtualservices'):
+                    virtualservice = VirtualService.model_validate(event['object'])
+                    # Filter out the mesh gateway, if present
+                    gateways = list(filter(lambda g: g != "mesh", virtualservice.spec.gateways))
+                    if len(gateways) > 1:
+                        self._logger.warning(f'VirtualService {virtualservice.metadata.name}/{virtualservice.metadata.namespace} has multiple gateways configured. Only the first one will be used.')
+                    if len(gateways) == 0:
+                        self._logger.warning(f'Skipping VirtualService {virtualservice.metadata.name}/{virtualservice.metadata.namespace} because it has no gateways configured')
+                        continue
+                    # The gateway namespace may be different from the virtualservice namespace
+                    if '/' in gateways[0]:
+                        gw_ns, gw_name = gateways[0].split('/')
+                    else:
+                        gw_ns = virtualservice.metadata.namespace
+                        gw_name = gateways[0]
+                    # Look up the gateway in the same namespace as the virtualservice.
+                    gw_raw = await self._api.get_namespaced_custom_object(group='networking.istio.io',
+                                                                      version='v1',
+                                                                      namespace=gw_ns,
+                                                                      plural='gateways',
+                                                                      name=gw_name)
+                    gw = NativeIstioGateway.model_validate(gw_raw)
+                    # Find all Services of type LoadBalancer and filter them on the selector of our gateway
+                    lb_svcs = await self._core_api.list_service_for_all_namespaces(field_selector='spec.type=LoadBalancer')
+                    lb_svc = list(filter(lambda s: s.spec.selector == gw.spec.selector, lb_svcs.items))
+                    if len(lb_svc) == 0:
+                        self._logger.warning(f'Skipping VirtualService {virtualservice.metadata.name}/{virtualservice.metadata.namespace} because no exposed service can be resolved for it')
+                        continue
+                    record = Record(owner_id=f'{virtualservice.metadata.namespace}/{virtualservice.metadata.name}',
+                                    hostname=virtualservice.spec.hosts[0],
+                                    ip_address=lb_svc[0].status.load_balancer.ingress[0].ip,
+                                    port=80)
+                    await self.register_record(event['type'], record)
+        except UnidentifiableResourceException as ur:
+            self._logger.warning(ur)
+        except GatewayNotReadyException as gnre:
+            self._logger.warning(gnre)
+        except kubernetes.client.exceptions.ApiException as ae:
             self._logger.info('Kubernetes API error, restarting')
         except asyncio.CancelledError:
             self._logger.info('Stopping')
