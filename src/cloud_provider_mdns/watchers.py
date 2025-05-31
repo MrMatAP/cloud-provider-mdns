@@ -1,11 +1,13 @@
 import asyncio
 
+import aiohttp.client_exceptions
 import kubernetes_asyncio as kubernetes     # type: ignore[import-untyped]
+import pydantic
 
 from cloud_provider_mdns.base import (
     GatewayNotReadyException, UnidentifiableResourceException,
     BaseWatcher, Record,
-    HTTPRoute, Gateway,
+    HTTPRoute, KubernetesGateway,
     VirtualService, NativeIstioGateway )
 from cloud_provider_mdns.registry import Registry
 
@@ -39,6 +41,8 @@ class IngressWatcher(BaseWatcher):
             self._logger.warning(gnre)
         except kubernetes.client.exceptions.ApiException:
             self._logger.info('Kubernetes API error, restarting')
+        except aiohttp.client_exceptions.ClientError as ce:
+            self._logger.info(f'Client error while connecting to Kubernetes API: {ce}')
         except asyncio.CancelledError:
             self._logger.info('Stopping')
             self._should_stop = True
@@ -77,7 +81,7 @@ class VirtualServiceWatcher(BaseWatcher):
                     else:
                         gw_ns = virtualservice.metadata.namespace
                         gw_name = gateways[0]
-                    # Look up the gateway in the same namespace as the virtualservice.
+                    # Look up the gateway
                     gw_raw = await self._api.get_namespaced_custom_object(group='networking.istio.io',
                                                                       version='v1',
                                                                       namespace=gw_ns,
@@ -101,6 +105,68 @@ class VirtualServiceWatcher(BaseWatcher):
             self._logger.warning(gnre)
         except kubernetes.client.exceptions.ApiException as ae:
             self._logger.info('Kubernetes API error, restarting')
+        except aiohttp.client_exceptions.ClientError as ce:
+            self._logger.info(f'Client error while connecting to Kubernetes API: {ce}')
+        except asyncio.CancelledError:
+            self._logger.info('Stopping')
+            self._should_stop = True
+            await self._watch.close()
+            raise
+
+class HTTPRouteWatcher(BaseWatcher):
+
+    def __init__(self, registry: Registry):
+        super().__init__(registry)
+        self._api = kubernetes.client.CustomObjectsApi()
+
+    async def run(self):
+        if not await self._has_api(required_api_name='gateway.networking.k8s.io'):
+            self._logger.warning('Not watching for HTTPRoutes because the cluster you are connected to does not know them')
+            return
+        self._logger.info('Watching for HTTPRoutes')
+        try:
+            while True:
+                async for event in self._watch.stream(self._api.list_cluster_custom_object,
+                                                      'gateway.networking.k8s.io',
+                                                      'v1',
+                                                      'httproutes'):
+                    if 'status' not in event['object']:
+                        self._logger.warning(f'Skipping HTTPRoute {event["object"]["metadata"]["name"]}/{event["object"]["metadata"]["namespace"]} because it has no status yet')
+                        continue
+                    if 'parents' not in event['object']['status']:
+                        self._logger.warning(f'Skipping HTTPRoute {event["object"]["metadata"]["name"]}/{event["object"]["metadata"]["namespace"]} because it has no parents')
+                    httproute = HTTPRoute.model_validate(event['object'])
+                    if len(httproute.status.parents) == 0:
+                        self._logger.warning(f'Skipping HTTPRoute {httproute.metadata.name}/{httproute.metadata.namespace} because it has no parents (yet)')
+                        continue
+                    if len(httproute.status.parents) > 1:
+                        self._logger.warning(f'HTTPRoute {httproute.metadata.name}/{httproute.metadata.namespace} has multiple gateways configured. Only the first one will be used.')
+                    gw_ns = httproute.status.parents[0].parentRef.namespace
+                    gw_name = httproute.status.parents[0].parentRef.name
+                    # Look up the gateway
+                    gw_raw = await self._api.get_namespaced_custom_object(group='gateway.networking.k8s.io',
+                                                                          version='v1',
+                                                                          namespace=gw_ns,
+                                                                          plural='gateways',
+                                                                          name=gw_name)
+                    gw = KubernetesGateway.model_validate(gw_raw)
+                    if len(gw.status.addresses) > 1:
+                        self._logger.warning(f'Gateway {gw_ns}/{gw} has multiple IP addresses configured. Only the first one will be used.')
+                    record = Record(owner_id=f'{httproute.metadata.namespace}/{httproute.metadata.name}',
+                                    hostname=httproute.spec.hostnames[0],
+                                    ip_address=gw.status.addresses[0].value,
+                                    port=80)
+                    await self.register_record(event['type'], record)
+        except UnidentifiableResourceException as ur:
+            self._logger.warning(ur)
+        except GatewayNotReadyException as gnre:
+            self._logger.warning(gnre)
+        except pydantic.ValidationError as ve:
+            self._logger.info('Unable to parse object')
+        except kubernetes.client.exceptions.ApiException:
+            self._logger.info('Kubernetes API error, restarting')
+        except aiohttp.client_exceptions.ClientError as ce:
+            self._logger.info(f'Client error while connecting to Kubernetes API: {ce}')
         except asyncio.CancelledError:
             self._logger.info('Stopping')
             self._should_stop = True

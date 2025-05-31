@@ -3,14 +3,14 @@ import logging
 
 import kubernetes_asyncio       # type: ignore[import-untyped]
 
-from cloud_provider_mdns.base import Gateway, HTTPRoute, Record, BaseNameserver
+from cloud_provider_mdns.base import KubernetesGateway, HTTPRoute, Record, BaseNameserver
 
 
 class Registry:
 
     def __init__(self) -> None:
         self._logger = logging.getLogger(self.__class__.__name__)
-        self._gateways: typing.Dict[str, Gateway] = {}
+        self._gateways: typing.Dict[str, KubernetesGateway] = {}
         self._routes: typing.Dict[str, HTTPRoute] = {}
         self._ingresses: typing.Dict[str, kubernetes_asyncio.client.V1Ingress] = {}
 
@@ -33,11 +33,14 @@ class Registry:
         self._logger.info(f'{record.owner_id} updates {record.hostname}')
 
     async def remove_record(self, record: Record):
-        self._records.remove(record)
+        if record not in self._records:
+            self._logger.warning(f'{record.owner_id} has already been removed from the registry')
+        else:
+            self._records.remove(record)
         await self._notify_subscribers()
         self._logger.info(f'{record.owner_id} removes {record.hostname}')
 
-    async def add_gateway(self, gateway: Gateway):
+    async def add_gateway(self, gateway: KubernetesGateway):
         gateway_id = f'{gateway.metadata.namespace}/{gateway.metadata.name}'
         if gateway_id in self._gateways:
             await self.modify_gateway(gateway)
@@ -70,13 +73,13 @@ class Registry:
                         self._records.add(rec)
         await self._notify_subscribers()
 
-    async def modify_gateway(self, gateway: Gateway):
+    async def modify_gateway(self, gateway: KubernetesGateway):
         resource_id = f'{gateway.metadata.namespace}/{gateway.metadata.name}'
         if resource_id in self._gateways:
             await self.remove_gateway(gateway)
         await self.add_gateway(gateway)
 
-    async def remove_gateway(self, gateway: Gateway):
+    async def remove_gateway(self, gateway: KubernetesGateway):
         gateway_id = f'{gateway.metadata.namespace}/{gateway.metadata.name}'
         if not gateway_id in self._gateways:
             self._logger.warning(f'{gateway_id} is not a known gateway')

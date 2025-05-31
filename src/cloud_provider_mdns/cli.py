@@ -12,6 +12,7 @@ from cloud_provider_mdns import console
 from cloud_provider_mdns.registry import Registry
 from cloud_provider_mdns.watchers import (
     IngressWatcher,
+    HTTPRouteWatcher,
     VirtualServiceWatcher
 )
 from cloud_provider_mdns.nameservers import MulticastNameserver, UnicastNameserver
@@ -73,10 +74,12 @@ async def main() -> int:
         console.print('[bold yellow]No nameservers are enabled. It will only show discovery[/bold yellow]')
     try:
         ingress_watcher = IngressWatcher(registry)
+        httproute_watcher = HTTPRouteWatcher(registry)
         virtual_service_watcher = VirtualServiceWatcher(registry)
         async with asyncio.TaskGroup() as tg:
             ingress_watcher_task = tg.create_task(ingress_watcher.run())
-            virtual_service_watcher = tg.create_task(virtual_service_watcher.run())
+            httproute_watcher_task = tg.create_task(httproute_watcher.run())
+            virtual_service_watcher_task = tg.create_task(virtual_service_watcher.run())
         return 0
     except asyncio.CancelledError:
         print('Shut down')
