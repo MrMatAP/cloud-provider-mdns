@@ -1,6 +1,6 @@
 import pytest
 
-from cloud_provider_mdns.base import ParentReference, GatewayListenerSpec
+from cloud_provider_mdns.base import ParentReference, KubernetesGatewayListenerSpec
 
 
 @pytest.mark.asyncio
