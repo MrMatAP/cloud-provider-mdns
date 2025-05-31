@@ -50,7 +50,7 @@ class Condition(PydanticIgnoreExtraFields):
     type: str
     status: bool
 
-class RouteParentStatus(PydanticIgnoreExtraFields):
+class HTTPRouteParentStatus(PydanticIgnoreExtraFields):
     """
     Status for a HTTPRoute parent
     """
@@ -62,7 +62,7 @@ class HTTPRouteStatus(PydanticIgnoreExtraFields):
     """
     Status for a HTTPRoute
     """
-    parents: typing.List[RouteParentStatus] = pydantic.Field(default_factory=list)
+    parents: typing.List[HTTPRouteParentStatus] = pydantic.Field(default_factory=list)
 
 class HTTPRoute(PydanticIgnoreExtraFields):
     """
@@ -80,7 +80,7 @@ class HTTPRoute(PydanticIgnoreExtraFields):
         return all(condition.status for condition in self.status.parents[0].conditions \
                    if condition.type == 'Accepted')
 
-    def spec_parent_by_status_parent_ref(self, parent: RouteParentStatus) -> ParentReference:
+    def spec_parent_by_status_parent_ref(self, parent: HTTPRouteParentStatus) -> ParentReference:
         """
         Return the spec parent for the given status parent ref of the HTTPRoute
         """
@@ -92,7 +92,7 @@ class HTTPRoute(PydanticIgnoreExtraFields):
     def __str__(self) -> str:
         return f'{self.metadata.namespace}/{self.metadata.name}'
 
-class GatewayListenerSpec(PydanticIgnoreExtraFields):
+class KubernetesGatewayListenerSpec(PydanticIgnoreExtraFields):
     """
     Spec for a GatewayListener
     """
@@ -104,9 +104,9 @@ class KubernetesGatewaySpec(PydanticIgnoreExtraFields):
     """
     Spec for a Gateway
     """
-    listeners: typing.List[GatewayListenerSpec] = pydantic.Field(default_factory=list)
+    listeners: typing.List[KubernetesGatewayListenerSpec] = pydantic.Field(default_factory=list)
 
-class GatewayAddresses(PydanticIgnoreExtraFields):
+class KubernetesGatewayAddresses(PydanticIgnoreExtraFields):
     """
     Addresses for a Gateway
     """
@@ -117,7 +117,7 @@ class KubernetesGatewayStatus(PydanticIgnoreExtraFields):
     """
     Status for a Gateway
     """
-    addresses: typing.List[GatewayAddresses] = pydantic.Field(default_factory=list)
+    addresses: typing.List[KubernetesGatewayAddresses] = pydantic.Field(default_factory=list)
 
 class KubernetesGateway(PydanticIgnoreExtraFields):
     """
