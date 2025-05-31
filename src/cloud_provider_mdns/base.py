@@ -100,7 +100,7 @@ class GatewayListenerSpec(PydanticIgnoreExtraFields):
     port: int
     protocol: str
 
-class GatewaySpec(PydanticIgnoreExtraFields):
+class KubernetesGatewaySpec(PydanticIgnoreExtraFields):
     """
     Spec for a Gateway
     """
@@ -113,21 +113,21 @@ class GatewayAddresses(PydanticIgnoreExtraFields):
     type: str
     value: str | None = None
 
-class GatewayStatus(PydanticIgnoreExtraFields):
+class KubernetesGatewayStatus(PydanticIgnoreExtraFields):
     """
     Status for a Gateway
     """
     addresses: typing.List[GatewayAddresses] = pydantic.Field(default_factory=list)
 
-class Gateway(PydanticIgnoreExtraFields):
+class KubernetesGateway(PydanticIgnoreExtraFields):
     """
     A record for a Gateway
     """
     apiVersion: str = pydantic.Field(default='gateway.networking.k8s.io/v1')
     kind: str = pydantic.Field(default='Gateway')
     metadata: ObjectMeta
-    spec: GatewaySpec
-    status: GatewayStatus
+    spec: KubernetesGatewaySpec
+    status: KubernetesGatewayStatus
 
     def addresses(self) -> typing.List[str]:
         """

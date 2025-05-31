@@ -3,9 +3,9 @@ import typing
 import pytest
 import pydantic
 
-from cloud_provider_mdns.base import Gateway, HTTPRoute, ObjectMeta, HTTPRouteSpec, \
+from cloud_provider_mdns.base import KubernetesGateway, HTTPRoute, ObjectMeta, HTTPRouteSpec, \
     ParentReference, HTTPRouteStatus, RouteParentStatus, Condition, BaseNameserver, Record, \
-    GatewaySpec, GatewayListenerSpec, GatewayStatus, GatewayAddresses
+    KubernetesGatewaySpec, GatewayListenerSpec, KubernetesGatewayStatus, GatewayAddresses
 from cloud_provider_mdns.registry import Registry
 
 @pytest.fixture(scope='function')
@@ -17,12 +17,12 @@ def registry():
 
 @pytest.fixture(scope='function')
 def gateway(registry):
-    return Gateway(
+    return KubernetesGateway(
         apiVersion='gateway.networking.k8s.io/v1',
         kind='Gateway',
         metadata=ObjectMeta(name='gw', namespace='edge'),
-        spec=GatewaySpec(listeners=[GatewayListenerSpec(name='https', port=443, protocol='HTTPS')]),
-        status=GatewayStatus(addresses=[GatewayAddresses(type='IPAddress', value='172.18.0.2')]))
+        spec=KubernetesGatewaySpec(listeners=[GatewayListenerSpec(name='https', port=443, protocol='HTTPS')]),
+        status=KubernetesGatewayStatus(addresses=[GatewayAddresses(type='IPAddress', value='172.18.0.2')]))
 
 @pytest.fixture(scope='function')
 def route():
