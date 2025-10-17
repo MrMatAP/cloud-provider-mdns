@@ -1,6 +1,28 @@
+#  MIT License
+#
+#  Copyright (c)  2025 Mathieu Imfeld
+#
+#  Permission is hereby granted, free of charge, to any person obtaining a copy
+#  of this software and associated documentation files (the "Software"), to deal
+#  in the Software without restriction, including without limitation the rights
+#  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#  copies of the Software, and to permit persons to whom the Software is
+#  furnished to do so, subject to the following conditions:
+#
+#  The above copyright notice and this permission notice shall be included in all
+#  copies or substantial portions of the Software.
+#
+#  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+#  SOFTWARE.
+
 import pytest
 
-from cloud_provider_mdns.base import ParentReference, KubernetesGatewayListenerSpec
+from cloud_provider_mdns.base import ParentReference
 
 
 @pytest.mark.asyncio
@@ -17,12 +39,13 @@ async def test_registry_one2one(registry, gateway, route):
     await registry.remove_route(route)
     assert len(registry.records()) == 0
 
+
 @pytest.mark.asyncio
 async def test_registry_one2one_gw_disappears(registry, gateway, route):
     """
-    This test verifies that when a gateway is removed, all associated route records 
-    are also removed from the registry, even if the routes themselves still exist. The test 
-    creates a gateway and route, adds them to registry, then removes the gateway to ensure 
+    This test verifies that when a gateway is removed, all associated route records
+    are also removed from the registry, even if the routes themselves still exist. The test
+    creates a gateway and route, adds them to registry, then removes the gateway to ensure
     cleanup occurs properly.
     """
     await registry.add_gateway(gateway)
@@ -32,6 +55,7 @@ async def test_registry_one2one_gw_disappears(registry, gateway, route):
     await registry.remove_gateway(gateway)
     assert len(registry.records()) == 0
 
+
 @pytest.mark.asyncio
 async def test_registry_many2one(registry, gateway, route):
     """
@@ -40,14 +64,14 @@ async def test_registry_many2one(registry, gateway, route):
     It also tests that all the routes bound to a single gateway are removed when the gateway is removed.
     """
     app1 = route.model_copy(deep=True)
-    app1.metadata.name = 'app1'
-    app1.spec.hostnames = ['app1.local']
+    app1.metadata.name = "app1"
+    app1.spec.hostnames = ["app1.local"]
     app2 = route.model_copy(deep=True)
-    app2.metadata.name = 'app2'
-    app2.spec.hostnames = ['app2.local', 'app2.test.org']
+    app2.metadata.name = "app2"
+    app2.spec.hostnames = ["app2.local", "app2.test.org"]
     app3 = route.model_copy(deep=True)
-    app3.metadata.name = 'app3'
-    app3.spec.hostnames = ['app3.local', 'app3.test.org']
+    app3.metadata.name = "app3"
+    app3.spec.hostnames = ["app3.local", "app3.test.org"]
 
     await registry.add_gateway(gateway)
     assert len(registry.records()) == 0
@@ -64,34 +88,40 @@ async def test_registry_many2one(registry, gateway, route):
     await registry.remove_gateway(gateway)
     assert len(registry.records()) == 0
 
+
 @pytest.mark.asyncio
 async def test_registry_update_route(registry, gateway, route):
     app1 = route.model_copy(deep=True)
-    app1.metadata.name = 'app1'
-    app1.spec.hostnames = ['app1.local']
+    app1.metadata.name = "app1"
+    app1.spec.hostnames = ["app1.local"]
 
     await registry.add_gateway(gateway)
     assert len(registry.records()) == 0
     await registry.add_route(app1)
     assert len(registry.records()) == 1
 
-    app1.spec.hostnames = ['app1.local', 'app1.test.org']
+    app1.spec.hostnames = ["app1.local", "app1.test.org"]
     await registry.add_route(app1)
     assert len(registry.records()) == 2
+
 
 @pytest.mark.asyncio
 async def test_route_many2many(registry, gateway, route):
     gw1 = gateway.model_copy(deep=True)
-    gw1.metadata.name = 'gw1'
+    gw1.metadata.name = "gw1"
     gw2 = gateway.model_copy(deep=True)
-    gw2.metadata.name = 'gw2'
+    gw2.metadata.name = "gw2"
 
     app1 = route.model_copy(deep=True)
-    app1.metadata.name = 'app1'
-    app1.spec.hostnames = ['app1.local', 'app1.test.org']
+    app1.metadata.name = "app1"
+    app1.spec.hostnames = ["app1.local", "app1.test.org"]
     app1.spec.parentRefs = [
-        ParentReference(namespace=gw1.metadata.namespace, name=gw1.metadata.name),
-        ParentReference(namespace=gw2.metadata.namespace, name=gw2.metadata.name)
+        ParentReference(
+            namespace=gw1.metadata.namespace, name=gw1.metadata.name
+        ),
+        ParentReference(
+            namespace=gw2.metadata.namespace, name=gw2.metadata.name
+        ),
     ]
 
     await registry.add_gateway(gw1)
