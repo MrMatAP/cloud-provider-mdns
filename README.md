@@ -137,3 +137,4 @@ The behaviour of this tool is to register all names declared in the HTTPRoute ag
 
 A single HTTPRoute binds to multiple Gateways. This is a more complex case because the declared hostnames are
 registered against the IP addresses of all Gateways. The tool will register the same hostname multiple times, for all IP addresses of all Gateways.
+
