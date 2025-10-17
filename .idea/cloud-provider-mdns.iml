@@ -6,8 +6,9 @@
       <excludeFolder url="file://$MODULE_DIR$/build" />
       <excludeFolder url="file://$MODULE_DIR$/dist" />
       <excludeFolder url="file://$MODULE_DIR$/var" />
+      <excludeFolder url="file://$MODULE_DIR$/.venv" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.13 virtualenv at /opt/dyn/python/cloud-provider-mdns" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="uv (cloud-provider-mdns)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PyDocumentationSettings">
