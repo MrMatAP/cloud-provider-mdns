@@ -1,3 +1,25 @@
+#  MIT License
+#
+#  Copyright (c)  2025 Mathieu Imfeld
+#
+#  Permission is hereby granted, free of charge, to any person obtaining a copy
+#  of this software and associated documentation files (the "Software"), to deal
+#  in the Software without restriction, including without limitation the rights
+#  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#  copies of the Software, and to permit persons to whom the Software is
+#  furnished to do so, subject to the following conditions:
+#
+#  The above copyright notice and this permission notice shall be included in all
+#  copies or substantial portions of the Software.
+#
+#  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+#  SOFTWARE.
+
 import sys
 import pathlib
 import asyncio
@@ -5,7 +27,7 @@ import asyncio
 import pydantic
 import pydantic_settings
 
-import kubernetes_asyncio as kubernetes     # type: ignore[import-untyped]
+import kubernetes_asyncio as kubernetes  # type: ignore[import-untyped]
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
 
 from cloud_provider_mdns import console
@@ -13,44 +35,65 @@ from cloud_provider_mdns.registry import Registry
 from cloud_provider_mdns.watchers import (
     IngressWatcher,
     HTTPRouteWatcher,
-    VirtualServiceWatcher
+    VirtualServiceWatcher,
 )
-from cloud_provider_mdns.nameservers import MulticastNameserver, UnicastNameserver
+from cloud_provider_mdns.nameservers import (
+    MulticastNameserver,
+    UnicastNameserver,
+)
 
 
 class Settings(pydantic_settings.BaseSettings):
-    model_config = pydantic_settings.SettingsConfigDict(cli_parse_args=True,
-                                                        cli_prog_name='cloud-provider-mdns',
-                                                        cli_kebab_case=True,
-                                                        cli_enforce_required=True,
-                                                        env_prefix='CLOUD_PROVIDER_MDNS_')
-    multicast_enable: pydantic_settings.CliImplicitFlag[bool] = pydantic.Field(default=True,
-                                                                               description='Enable multicast DNS updates')
-    unicast_enable: pydantic_settings.CliImplicitFlag[bool] = pydantic.Field(default=False,
-                                                                             description='Enable unicast DNS updates')
-    unicast_ip: str = pydantic.Field(default='127.0.0.1',
-                                     description='IP address of the unicast DNS server to update')
-    unicast_domain: str = pydantic.Field(default='k8s',
-                                         description='Register only names ending in this domain within unicast DNS')
-    unicast_key_name: str = pydantic.Field(default='',
-                                           description='The TSIG key name')
-    unicast_key_secret: str = pydantic.Field(default='',
-                                             description='The TSIG key secret')
+    model_config = pydantic_settings.SettingsConfigDict(
+        cli_parse_args=True,
+        cli_prog_name="cloud-provider-mdns",
+        cli_kebab_case=True,
+        cli_enforce_required=True,
+        env_prefix="CLOUD_PROVIDER_MDNS_",
+    )
+    multicast_enable: pydantic_settings.CliImplicitFlag[bool] = pydantic.Field(
+        default=True, description="Enable multicast DNS updates"
+    )
+    unicast_enable: pydantic_settings.CliImplicitFlag[bool] = pydantic.Field(
+        default=False, description="Enable unicast DNS updates"
+    )
+    unicast_ip: str = pydantic.Field(
+        default="127.0.0.1",
+        description="IP address of the unicast DNS server to update",
+    )
+    unicast_domain: str = pydantic.Field(
+        default="k8s",
+        description="Register only names ending in this domain within unicast DNS",
+    )
+    unicast_key_name: str = pydantic.Field(
+        default="", description="The TSIG key name"
+    )
+    unicast_key_secret: str = pydantic.Field(
+        default="", description="The TSIG key secret"
+    )
 
     @classmethod
-    def settings_customise_sources(cls, settings_cls: type[BaseSettings],
-                                   init_settings: PydanticBaseSettingsSource,
-                                   env_settings: PydanticBaseSettingsSource,
-                                   dotenv_settings: PydanticBaseSettingsSource,
-                                   file_secret_settings: PydanticBaseSettingsSource) -> tuple[
-        PydanticBaseSettingsSource, ...]:
-        return (init_settings,
-                env_settings,
-                dotenv_settings,
-                file_secret_settings,
-                pydantic_settings.JsonConfigSettingsSource(settings_cls,
-                                                           json_file=pathlib.Path('~/etc/cloud-provider-mdns.json').expanduser().resolve(),
-                                                           json_file_encoding='utf-8'))
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        return (
+            init_settings,
+            env_settings,
+            dotenv_settings,
+            file_secret_settings,
+            pydantic_settings.JsonConfigSettingsSource(
+                settings_cls,
+                json_file=pathlib.Path("~/etc/cloud-provider-mdns.json")
+                .expanduser()
+                .resolve(),
+                json_file_encoding="utf-8",
+            ),
+        )
 
 
 async def main() -> int:
@@ -63,15 +106,19 @@ async def main() -> int:
     else:
         mcast_ns = None
     if settings.unicast_enable:
-        ucast_ns = UnicastNameserver(registry=registry,
-                                     ip=settings.unicast_ip,
-                                     domain=settings.unicast_domain,
-                                     key=settings.unicast_key_name,
-                                     secret=settings.unicast_key_secret)
+        ucast_ns = UnicastNameserver(
+            registry=registry,
+            ip=settings.unicast_ip,
+            domain=settings.unicast_domain,
+            key=settings.unicast_key_name,
+            secret=settings.unicast_key_secret,
+        )
     else:
         ucast_ns = None
     if mcast_ns is None and ucast_ns is None:
-        console.print('[bold yellow]No nameservers are enabled. It will only show discovery[/bold yellow]')
+        console.print(
+            "[bold yellow]No nameservers are enabled. It will only show discovery[/bold yellow]"
+        )
     try:
         ingress_watcher = IngressWatcher(registry)
         httproute_watcher = HTTPRouteWatcher(registry)
@@ -79,13 +126,15 @@ async def main() -> int:
         async with asyncio.TaskGroup() as tg:
             ingress_watcher_task = tg.create_task(ingress_watcher.run())
             httproute_watcher_task = tg.create_task(httproute_watcher.run())
-            virtual_service_watcher_task = tg.create_task(virtual_service_watcher.run())
+            virtual_service_watcher_task = tg.create_task(
+                virtual_service_watcher.run()
+            )
         return 0
     except asyncio.CancelledError:
-        print('Shut down')
+        print("Shut down")
         return 0
     except KeyboardInterrupt:
-        print('Keyboard interrupt, shutting down')
+        print("Keyboard interrupt, shutting down")
         return 0
     finally:
         if mcast_ns is not None:
@@ -94,10 +143,9 @@ async def main() -> int:
             await ucast_ns.shutdown()
 
 
-
 def run() -> int:
     sys.exit(asyncio.run(main()))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run()
