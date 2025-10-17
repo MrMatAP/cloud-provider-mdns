@@ -1,6 +1,6 @@
 # Cloud Provider :: mDNS
 
-[![CI](https://github.com/MrMatAP/cloud-provider-mdns/actions/workflows/build.yml/badge.svg)](https://github.com/MrMatAP/cloud-provider-mdns/actions/workflows/ci.yml)
+[![CI](https://github.com/MrMatAP/cloud-provider-mdns/actions/workflows/ci.yml/badge.svg)](https://github.com/MrMatAP/cloud-provider-mdns/actions/workflows/ci.yml)
 
 > This is a proof of concept. Do not consider it to be free of issues. It works reasonably well for registering names
 > in your local Kubernetes cluster you use for engineering, such as the one created by [kube-eng](https://github.com/mrmatap/kube-eng).
