@@ -1,25 +1,24 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="lint" type="PythonConfigurationType" factoryName="Python">
-    <module name="cloud-provider-mdns" />
-    <option name="ENV_FILES" value="" />
-    <option name="INTERPRETER_OPTIONS" value="" />
-    <option name="PARENT_ENVS" value="true" />
-    <envs>
-      <env name="PYTHONUNBUFFERED" value="1" />
-    </envs>
-    <option name="SDK_HOME" value="" />
-    <option name="WORKING_DIRECTORY" value="$ProjectFileDir$" />
-    <option name="IS_MODULE_SDK" value="true" />
-    <option name="ADD_CONTENT_ROOTS" value="true" />
-    <option name="ADD_SOURCE_ROOTS" value="true" />
-    <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-    <option name="SCRIPT_NAME" value="mypy" />
-    <option name="PARAMETERS" value="src/cloud_provider_mdns" />
-    <option name="SHOW_COMMAND_LINE" value="false" />
-    <option name="EMULATE_TERMINAL" value="true" />
-    <option name="MODULE_MODE" value="true" />
-    <option name="REDIRECT_INPUT" value="false" />
-    <option name="INPUT_FILE" value="" />
+  <configuration default="false" name="lint" type="UvRunConfigurationType" factoryName="UvRunConfigurationType">
+    <option name="args">
+      <list>
+        <option value="--no-incremental" />
+        <option value="--junit-xml=build/lint.xml" />
+        <option value="src/cloud_provider_mdns" />
+      </list>
+    </option>
+    <option name="checkSync" value="false" />
+    <option name="env">
+      <map />
+    </option>
+    <option name="runType" value="MODULE" />
+    <option name="scriptOrModule" value="mypy" />
+    <option name="uvArgs">
+      <list>
+        <option value="--frozen" />
+      </list>
+    </option>
+    <option name="uvSdkKey" value="uv (cloud-provider-mdns)" />
     <method v="2" />
   </configuration>
 </component>

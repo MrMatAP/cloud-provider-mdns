@@ -1,6 +1,6 @@
 # Cloud Provider :: mDNS
 
-[![Build](https://github.com/MrMatAP/cloud-provider-mdns/actions/workflows/build.yml/badge.svg)](https://github.com/MrMatAP/cloud-provider-mdns/actions/workflows/build.yml)
+[![CI](https://github.com/MrMatAP/cloud-provider-mdns/actions/workflows/build.yml/badge.svg)](https://github.com/MrMatAP/cloud-provider-mdns/actions/workflows/ci.yml)
 
 > This is a proof of concept. Do not consider it to be free of issues. It works reasonably well for registering names
 > in your local Kubernetes cluster you use for engineering, such as the one created by [kube-eng](https://github.com/mrmatap/kube-eng).
@@ -49,29 +49,26 @@ environment variables.
 
 ## How to build this
 
-Clone this repository, create a Python virtualenv (you'll need Python >= 3.12), then build and install:
+### Interactively
 
-```shell
-$ python3 -mvenv /path/to/virtualenv
-$ . /path/to/virtualenv/bin/activate
+The project uses the [uv build tool](https://docs.astral.sh/uv/). Install it first, then simply run `uv build --wheel`.
 
-(venv) $ pip install -r requirements.dev.txt -r requirements.txt
-... many lines omitted
+All interactive builds default their version to '0.0.0.dev0', which we use as a marker that this is a locally produced
+build which should not go into production. You can override this behaviour by setting the 'MRMAT_VERSION' environment
+variable to the desired version, but doing so is discouraged.
 
-(venv) $ python3 -mbuild -n --wheel
-... many lines omitted
-Successfully built cloud_provider_mdns-0.0.0.dev0-py3-none-any.whl
+### Continuous Integration
 
-(venv) $ pip3 install dist/cloud_provider_mdns-*.whl
-... many lines omitted
-```
+GitHub Actions will trigger builds for pushes and pull requests. A merge push onto the main branch will additionally
+create a release.
 
-It is best to install the script into the virtual environment. If you do not like that, you can deactivate the
-virtual environment and install into whatever your Python considers the user installation directory. On Linux, that
-directory is going to be `~/.local`. On MacOs it's `~/Library/Python/<Python Version>`. If you don't like that either,
-you can permanently set the PYTHONUSERBASE environment variable to wherever things are to be installed. Current Python
-is very picky about you installing outside a virtual environment, so you must specify the `--user` and
-`--break-system-packages` options to pip when doing that.
+All builds on branches other than main will have their version calculated from the MAJOR, MINOR and GITHUB_RUN_NUMBER
+environment variables with a '.dev0' suffix appended. You can set the MAJOR and MINOR variables in
+`.github/workflows/build.yml`. Builds resulting from a merge push onto the main branch will not have a suffix.
+
+The resulting code is aware of its version at build-time via the extra `src/ci` module, which is explicitly excluded from
+the distribution. Pythons own `importlib.metadata` is then used to make the version available at runtime.
+
 
 ## Issues & Limitations
 
