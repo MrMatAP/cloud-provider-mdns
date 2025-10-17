@@ -35,8 +35,7 @@ class PydanticIgnoreExtraFields(pydantic.BaseModel):
     A base class for Pydantic models that ignores extra fields
     """
 
-    class Config:
-        extra = "ignore"
+    model_config = pydantic.ConfigDict(extra="allow")
 
 
 class ObjectMeta(PydanticIgnoreExtraFields):
