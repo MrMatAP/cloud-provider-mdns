@@ -1,8 +1,8 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="lint" type="UvRunConfigurationType" factoryName="UvRunConfigurationType">
+  <configuration default="false" name="format:write" type="UvRunConfigurationType" factoryName="UvRunConfigurationType">
     <option name="args">
       <list>
-        <option value="check" />
+        <option value="format" />
       </list>
     </option>
     <option name="checkSync" value="false" />
@@ -10,7 +10,7 @@
       <map />
     </option>
     <option name="runType" value="MODULE" />
-    <option name="scriptOrModule" value="pyrefly" />
+    <option name="scriptOrModule" value="ruff" />
     <option name="uvArgs">
       <list>
         <option value="--frozen" />

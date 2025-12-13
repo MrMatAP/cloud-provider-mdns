@@ -60,15 +60,11 @@ def gateway(registry):
         metadata=ObjectMeta(name="gw", namespace="edge"),
         spec=KubernetesGatewaySpec(
             listeners=[
-                KubernetesGatewayListenerSpec(
-                    name="https", port=443, protocol="HTTPS"
-                )
+                KubernetesGatewayListenerSpec(name="https", port=443, protocol="HTTPS")
             ]
         ),
         status=KubernetesGatewayStatus(
-            addresses=[
-                KubernetesGatewayAddresses(type="IPAddress", value="172.18.0.2")
-            ]
+            addresses=[KubernetesGatewayAddresses(type="IPAddress", value="172.18.0.2")]
         ),
     )
 

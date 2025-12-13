@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="Black">
-    <option name="enabledOnReformat" value="true" />
     <option name="sdkName" value="uv (cloud-provider-mdns)" />
   </component>
   <component name="JsBowerSettings">
@@ -9,4 +8,10 @@
     <config-path />
   </component>
   <component name="ProjectRootManager" version="2" project-jdk-name="uv (cloud-provider-mdns)" project-jdk-type="Python SDK" />
+  <component name="PyreflyConfiguration">
+    <option name="enabled" value="true" />
+  </component>
+  <component name="RuffConfiguration">
+    <option name="enabled" value="true" />
+  </component>
 </project>

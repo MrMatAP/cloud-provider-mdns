@@ -66,9 +66,7 @@ class HTTPRouteSpec(PydanticIgnoreExtraFields):
     We omit the rules field since we do not need to parse it for registering DNS
     """
 
-    parentRefs: typing.List[ParentReference] = pydantic.Field(
-        default_factory=list
-    )
+    parentRefs: typing.List[ParentReference] = pydantic.Field(default_factory=list)
     hostnames: typing.List[str] = pydantic.Field(default_factory=list)
 
 
@@ -97,9 +95,7 @@ class HTTPRouteStatus(PydanticIgnoreExtraFields):
     Status for a HTTPRoute
     """
 
-    parents: typing.List[HTTPRouteParentStatus] = pydantic.Field(
-        default_factory=list
-    )
+    parents: typing.List[HTTPRouteParentStatus] = pydantic.Field(default_factory=list)
 
 
 class HTTPRoute(PydanticIgnoreExtraFields):
@@ -129,17 +125,11 @@ class HTTPRoute(PydanticIgnoreExtraFields):
         Return the spec parent for the given status parent ref of the HTTPRoute
         """
         spec_parent = next(
-            (
-                p
-                for p in self.spec.parentRefs
-                if p.name == parent.parentRef.name
-            ),
+            (p for p in self.spec.parentRefs if p.name == parent.parentRef.name),
             None,
         )
         if spec_parent is None:
-            raise ValueError(
-                f"No spec parent found for {parent.parentRef.name}"
-            )
+            raise ValueError(f"No spec parent found for {parent.parentRef.name}")
         return spec_parent
 
     def __str__(self) -> str:
@@ -216,9 +206,7 @@ class KubernetesGateway(PydanticIgnoreExtraFields):
         """
         Return the port for a given section name
         """
-        section = list(
-            filter(lambda s: s.name == section_name, self.spec.listeners)
-        )
+        section = list(filter(lambda s: s.name == section_name, self.spec.listeners))
         if len(section) == 0:
             return None
         return section[0].port
@@ -401,7 +389,6 @@ class BaseNameserver:
 
 
 class BaseWatcher(BaseTask):
-
     def __init__(self, registry: "Registry") -> None:
         super().__init__()
         self._registry = registry
@@ -414,9 +401,7 @@ class BaseWatcher(BaseTask):
         match op:
             case "ADDED":
                 await self._registry.add_record(record)
-                self._logger.info(
-                    f"Record {record.owner_id} adds {record.hostname}"
-                )
+                self._logger.info(f"Record {record.owner_id} adds {record.hostname}")
             case "MODIFIED":
                 await self._registry.modify_record(record)
                 self._logger.info(
@@ -424,9 +409,7 @@ class BaseWatcher(BaseTask):
                 )
             case "DELETED":
                 await self._registry.remove_record(record)
-                self._logger.info(
-                    f"Record {record.owner_id} removes {record.hostname}"
-                )
+                self._logger.info(f"Record {record.owner_id} removes {record.hostname}")
 
     @staticmethod
     async def _has_api(required_api_name: str) -> bool:
@@ -436,8 +419,5 @@ class BaseWatcher(BaseTask):
         apis_api = kubernetes.client.ApisApi()
         resources = await apis_api.get_api_versions()
         return (
-            list(
-                filter(lambda r: r.name == required_api_name, resources.groups)
-            )
-            != []
+            list(filter(lambda r: r.name == required_api_name, resources.groups)) != []
         )
