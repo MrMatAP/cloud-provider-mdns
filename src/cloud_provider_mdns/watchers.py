@@ -40,7 +40,6 @@ from cloud_provider_mdns.registry import Registry
 
 
 class IngressWatcher(BaseWatcher):
-
     def __init__(self, registry: Registry):
         super().__init__(registry)
         self._api = kubernetes.client.NetworkingV1Api()
@@ -80,9 +79,7 @@ class IngressWatcher(BaseWatcher):
         except kubernetes.client.exceptions.ApiException:
             self._logger.info("Kubernetes API error, restarting")
         except aiohttp.client_exceptions.ClientError as ce:
-            self._logger.info(
-                f"Client error while connecting to Kubernetes API: {ce}"
-            )
+            self._logger.info(f"Client error while connecting to Kubernetes API: {ce}")
         except asyncio.CancelledError:
             self._logger.info("Stopping")
             self._should_stop = True
@@ -91,7 +88,6 @@ class IngressWatcher(BaseWatcher):
 
 
 class VirtualServiceWatcher(BaseWatcher):
-
     def __init__(self, registry: Registry):
         super().__init__(registry)
         self._api = kubernetes.client.CustomObjectsApi()
@@ -112,14 +108,10 @@ class VirtualServiceWatcher(BaseWatcher):
                     "v1",
                     "virtualservices",
                 ):
-                    virtualservice = VirtualService.model_validate(
-                        event["object"]
-                    )
+                    virtualservice = VirtualService.model_validate(event["object"])
                     # Filter out the mesh gateway, if present
                     gateways = list(
-                        filter(
-                            lambda g: g != "mesh", virtualservice.spec.gateways
-                        )
+                        filter(lambda g: g != "mesh", virtualservice.spec.gateways)
                     )
                     if len(gateways) > 1:
                         self._logger.warning(
@@ -146,10 +138,8 @@ class VirtualServiceWatcher(BaseWatcher):
                     )
                     gw = NativeIstioGateway.model_validate(gw_raw)
                     # Find all Services of type LoadBalancer and filter them on the selector of our gateway
-                    lb_svcs = (
-                        await self._core_api.list_service_for_all_namespaces(
-                            field_selector="spec.type=LoadBalancer"
-                        )
+                    lb_svcs = await self._core_api.list_service_for_all_namespaces(
+                        field_selector="spec.type=LoadBalancer"
                     )
                     lb_svc = list(
                         filter(
@@ -176,9 +166,7 @@ class VirtualServiceWatcher(BaseWatcher):
         except kubernetes.client.exceptions.ApiException as ae:
             self._logger.info("Kubernetes API error, restarting")
         except aiohttp.client_exceptions.ClientError as ce:
-            self._logger.info(
-                f"Client error while connecting to Kubernetes API: {ce}"
-            )
+            self._logger.info(f"Client error while connecting to Kubernetes API: {ce}")
         except asyncio.CancelledError:
             self._logger.info("Stopping")
             self._should_stop = True
@@ -187,15 +175,12 @@ class VirtualServiceWatcher(BaseWatcher):
 
 
 class HTTPRouteWatcher(BaseWatcher):
-
     def __init__(self, registry: Registry):
         super().__init__(registry)
         self._api = kubernetes.client.CustomObjectsApi()
 
     async def run(self):
-        if not await self._has_api(
-            required_api_name="gateway.networking.k8s.io"
-        ):
+        if not await self._has_api(required_api_name="gateway.networking.k8s.io"):
             self._logger.warning(
                 "Not watching for HTTPRoutes because the cluster you are connected to does not know them"
             )
@@ -211,12 +196,12 @@ class HTTPRouteWatcher(BaseWatcher):
                 ):
                     if "status" not in event["object"]:
                         self._logger.warning(
-                            f'Skipping HTTPRoute {event["object"]["metadata"]["name"]}/{event["object"]["metadata"]["namespace"]} because it has no status yet'
+                            f"Skipping HTTPRoute {event['object']['metadata']['name']}/{event['object']['metadata']['namespace']} because it has no status yet"
                         )
                         continue
                     if "parents" not in event["object"]["status"]:
                         self._logger.warning(
-                            f'Skipping HTTPRoute {event["object"]["metadata"]["name"]}/{event["object"]["metadata"]["namespace"]} because it has no parents'
+                            f"Skipping HTTPRoute {event['object']['metadata']['name']}/{event['object']['metadata']['namespace']} because it has no parents"
                         )
                     httproute = HTTPRoute.model_validate(event["object"])
                     if len(httproute.status.parents) == 0:
@@ -259,9 +244,7 @@ class HTTPRouteWatcher(BaseWatcher):
         except kubernetes.client.exceptions.ApiException:
             self._logger.info("Kubernetes API error, restarting")
         except aiohttp.client_exceptions.ClientError as ce:
-            self._logger.info(
-                f"Client error while connecting to Kubernetes API: {ce}"
-            )
+            self._logger.info(f"Client error while connecting to Kubernetes API: {ce}")
         except asyncio.CancelledError:
             self._logger.info("Stopping")
             self._should_stop = True

@@ -20,12 +20,12 @@ jobs:
     steps:
     - name: Abort building on push with open PR
       id: debounce
-      uses: MrMatAP/mrmat-build-avoider-action@1.0.19
+      uses: MrMatAP/mrmat-debounce-action@latest
       with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
+        github_token: ${{ secrets.GITHUB_TOKEN }}
     - name: Version the project
       id: version
-      uses: MrMatAP/mrmat-versioning-action@1.0.7
+      uses: MrMatAP/mrmat-versioning-action@latest
       with:
         ecosystem: python
         major: 1
@@ -56,43 +56,11 @@ jobs:
       run: uv build --wheel
     - name: Test
       run: uv run --frozen pytest --junit-xml=${GITHUB_WORKSPACE}/build/junit.xml --cov-report=xml:${GITHUB_WORKSPACE}/build/coverage.xml
-    - name: Upload linting results
-      if: ${{ github.event_name == 'pull_request' }}
-      uses: actions/upload-artifact@v4
-      with:
-        name: Lint Results
-        path: build/lint.xml
-        retention-days: 1
-    - name: Upload unit test results
-      if: ${{ github.event_name == 'pull_request' }}
-      uses: actions/upload-artifact@v4
-      with:
-        name: Unit Test Results
-        path: build/junit.xml
-        retention-days: 1
-    - name: Upload coverage results
-      if: ${{ github.event_name == 'pull_request' }}
-      uses: actions/upload-artifact@v4
-      with:
-        name: Coverage Results
-        path: build/coverage.xml
-        retention-days: 1
-    - name: Report on unit tests
-      if: ${{ github.event_name == 'pull_request' }}
-      uses: EnricoMi/publish-unit-test-result-action@v2
-      with:
-        check_name: "Unit Tests"
-        comment_title: "Unit Test Results"
-        files: build/junit.xml
-    - name: Report on code coverage
-      if: ${{ github.event_name == 'pull_request' }}
-      uses: irongut/CodeCoverageSummary@v1.3.0
-      with:
-        filename: build/coverage.xml
 
   # The release job only executes when pushing to the main branch
   release:
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    if:
+      ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -100,15 +68,15 @@ jobs:
     - prep
     - build
     steps:
+    - name: Checkout out our code
+      uses: actions/checkout@v5.0.0
     - name: Create Release
       id: create_release
-      uses: actions/create-release@latest
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: MrMatAP/mrmat-release-action@latest
       with:
-        tag_name: ${{ needs.prep.outputs.version }}
+        github_token: ${{ secrets.GITHUB_TOKEN }}
         release_name: Release ${{ needs.prep.outputs.version }}
-        body: |
+        release_version: ${{ needs.prep.outputs.version }}
+        release_description: |
           Release ${{ needs.prep.outputs.version }}
-        draft: false
-        prerelease: false
+        update_latest: false

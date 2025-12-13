@@ -65,9 +65,7 @@ class Settings(pydantic_settings.BaseSettings):
         default="k8s",
         description="Register only names ending in this domain within unicast DNS",
     )
-    unicast_key_name: str = pydantic.Field(
-        default="", description="The TSIG key name"
-    )
+    unicast_key_name: str = pydantic.Field(default="", description="The TSIG key name")
     unicast_key_secret: str = pydantic.Field(
         default="", description="The TSIG key secret"
     )
@@ -126,9 +124,7 @@ async def main() -> int:
         async with asyncio.TaskGroup() as tg:
             ingress_watcher_task = tg.create_task(ingress_watcher.run())
             httproute_watcher_task = tg.create_task(httproute_watcher.run())
-            virtual_service_watcher_task = tg.create_task(
-                virtual_service_watcher.run()
-            )
+            virtual_service_watcher_task = tg.create_task(virtual_service_watcher.run())
         return 0
     except asyncio.CancelledError:
         print("Shut down")

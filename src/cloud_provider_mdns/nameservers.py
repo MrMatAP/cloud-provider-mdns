@@ -44,23 +44,16 @@ class MulticastNameserver(BaseNameserver):
 
     def __init__(self, registry: Registry, *args, **kwargs) -> None:
         super().__init__(registry, *args, **kwargs)
-        self._aiozc = zeroconf.asyncio.AsyncZeroconf(
-            ip_version=zeroconf.IPVersion.All
-        )
-        self._registered: typing.Dict[
-            Record, zeroconf.asyncio.AsyncServiceInfo
-        ] = {}
+        self._aiozc = zeroconf.asyncio.AsyncZeroconf(ip_version=zeroconf.IPVersion.All)
+        self._registered: typing.Dict[Record, zeroconf.asyncio.AsyncServiceInfo] = {}
 
     async def shutdown(self):
         await self._aiozc.async_unregister_all_services()
         await self._aiozc.async_close()
 
     async def update(self, records: typing.Set[Record]):
-
         # Filter out records that do not end in .local.
-        local_records = set(
-            filter(lambda r: r.fqdn.endswith(".local."), records)
-        )
+        local_records = set(filter(lambda r: r.fqdn.endswith(".local."), records))
 
         # Remove records
         for rec in set(self._registered.keys()).difference(local_records):
@@ -79,9 +72,7 @@ class MulticastNameserver(BaseNameserver):
                     addresses=[ipaddress.ip_address(rec.ip_address).packed],
                     server=rec.fqdn,
                 )
-                await self._aiozc.async_register_service(
-                    si, allow_name_change=True
-                )
+                await self._aiozc.async_register_service(si, allow_name_change=True)
                 self._registered[rec] = si
                 self._logger.info(
                     f"Added {rec.fqdn} pointing to {rec.ip_address}:{rec.port} for {rec.owner_id}"
@@ -132,9 +123,7 @@ class UnicastNameserver(BaseNameserver):
             and kwargs["key"] is not None
             and kwargs["secret"] is not None
         ):
-            self._keyring = dns.tsigkeyring.from_text(
-                {kwargs["key"]: kwargs["secret"]}
-            )
+            self._keyring = dns.tsigkeyring.from_text({kwargs["key"]: kwargs["secret"]})
 
     async def shutdown(self):
         """
@@ -143,7 +132,6 @@ class UnicastNameserver(BaseNameserver):
         pass
 
     async def update(self, records: typing.Set[Record]):
-
         # Filter out records that do not end in the local domain
         local_records = set(
             filter(lambda r: r.fqdn.endswith(f"{self._domain}"), records)
@@ -163,9 +151,7 @@ class UnicastNameserver(BaseNameserver):
                     )
                     self._registered.remove(rec)
             except dns.exception.DNSException as de:
-                self._logger.warning(
-                    f"Exception while removing {rec.fqdn}: {de}"
-                )
+                self._logger.warning(f"Exception while removing {rec.fqdn}: {de}")
 
         # Modify records
         for rec in set(self._registered).intersection(local_records):
@@ -180,9 +166,7 @@ class UnicastNameserver(BaseNameserver):
                         f"Record {rec.owner_id} modifies {rec.fqdn} to {rec.ip_address}"
                     )
             except dns.exception.DNSException as de:
-                self._logger.warning(
-                    f"Exception while modifying {rec.fqdn}: {de}"
-                )
+                self._logger.warning(f"Exception while modifying {rec.fqdn}: {de}")
 
         # Add records
         for rec in local_records.difference(self._registered):

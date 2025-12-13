@@ -116,12 +116,8 @@ async def test_route_many2many(registry, gateway, route):
     app1.metadata.name = "app1"
     app1.spec.hostnames = ["app1.local", "app1.test.org"]
     app1.spec.parentRefs = [
-        ParentReference(
-            namespace=gw1.metadata.namespace, name=gw1.metadata.name
-        ),
-        ParentReference(
-            namespace=gw2.metadata.namespace, name=gw2.metadata.name
-        ),
+        ParentReference(namespace=gw1.metadata.namespace, name=gw1.metadata.name),
+        ParentReference(namespace=gw2.metadata.namespace, name=gw2.metadata.name),
     ]
 
     await registry.add_gateway(gw1)

@@ -34,14 +34,11 @@ from cloud_provider_mdns.base import (
 
 
 class Registry:
-
     def __init__(self) -> None:
         self._logger = logging.getLogger(self.__class__.__name__)
         self._gateways: typing.Dict[str, KubernetesGateway] = {}
         self._routes: typing.Dict[str, HTTPRoute] = {}
-        self._ingresses: typing.Dict[
-            str, kubernetes_asyncio.client.V1Ingress
-        ] = {}
+        self._ingresses: typing.Dict[str, kubernetes_asyncio.client.V1Ingress] = {}
 
         self._records: typing.Set[Record] = set()
         self._subscribers: typing.Set[BaseNameserver] = set()
@@ -125,9 +122,7 @@ class Registry:
         if not gateway_id in self._gateways:
             self._logger.warning(f"{gateway_id} is not a known gateway")
             return
-        records = list(
-            filter(lambda r: r.gateway_id == gateway_id, self._records)
-        )
+        records = list(filter(lambda r: r.gateway_id == gateway_id, self._records))
         for rec in records:
             self._records.remove(rec)
         del self._gateways[gateway_id]
@@ -141,7 +136,9 @@ class Registry:
         self._routes[resource_id] = route
 
         for parent_ref in route.spec.parentRefs:
-            gateway_id = f"{parent_ref.namespace or route.metadata.namespace}/{parent_ref.name}"
+            gateway_id = (
+                f"{parent_ref.namespace or route.metadata.namespace}/{parent_ref.name}"
+            )
             if not gateway_id in self._gateways:
                 self._logger.warning(
                     f"{resource_id} specifies gateway {gateway_id} but it is "
@@ -181,9 +178,7 @@ class Registry:
         if not resource_id in self._routes:
             self._logger.warning(f"{resource_id} is not a known HTTP route")
             return
-        records = list(
-            filter(lambda r: r.owner_id == resource_id, self._records)
-        )
+        records = list(filter(lambda r: r.owner_id == resource_id, self._records))
         for rec in records:
             self._records.remove(rec)
         del self._routes[resource_id]
@@ -197,17 +192,13 @@ class Registry:
         self._ingresses[resource_id] = ingress
         await self._notify_subscribers()
 
-    async def modify_ingress(
-        self, ingress: kubernetes_asyncio.client.V1Ingress
-    ):
+    async def modify_ingress(self, ingress: kubernetes_asyncio.client.V1Ingress):
         resource_id = f"{ingress.metadata.namespace}/{ingress.metadata.name}"
         if resource_id in self._ingresses:
             await self.remove_ingress(ingress)
         await self.add_ingress(ingress)
 
-    async def remove_ingress(
-        self, ingress: kubernetes_asyncio.client.V1Ingress
-    ):
+    async def remove_ingress(self, ingress: kubernetes_asyncio.client.V1Ingress):
         resource_id = f"{ingress.metadata.namespace}/{ingress.metadata.name}"
         if resource_id in self._ingresses:
             del self._ingresses[resource_id]
